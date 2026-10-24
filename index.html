@@ -222,6 +222,7 @@ tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
   .rtag{margin-right:3px;font-size:7px;padding:0 2px}
   .card{padding:14px 10px}
 }
+.unc{color:var(--neg);font-weight:800}
 </style></head><body>
 <div class="wrap">
   <header>
@@ -490,10 +491,13 @@ function drawTira(a){
   const pcOf=r=>state.spot?(r.price/state.spot-1)*100:null;
   let loI=-1,hiI=-1;
   if(state.spot){rows.forEach((r,i)=>{const q=pcOf(r);if(q>=-10.05&&loI<0)loI=i;if(q<=10.05)hiI=i});}
-  const covers=state.spot&&pcOf(rows[0])<=-10&&pcOf(rows[rows.length-1])>=10;
   if(state.spot&&loI>=0&&hiI>=loI){
-    let mn=Infinity;for(let i=loI;i<=hiI;i++)mn=Math.min(mn,rows[i].fin);
-    $('tirasub').textContent+=' · Regla ±10%: '+(covers?'cubierta':'la tabla no llega a ±10%')+' · peor Finish en el rango '+money(mn);
+    let mn=Infinity,at=0;for(let i=loI;i<=hiI;i++)if(rows[i].fin<mn){mn=rows[i].fin;at=rows[i].price}
+    const ok=mn>=0,sp=el('span','rule');
+    sp.append(document.createTextNode(' · Regla de oro ±10%: '));
+    sp.append(ok?document.createTextNode('cubierta'):el('b','unc','descubierta'));
+    sp.append(document.createTextNode(' · peor Finish '+money(mn)+(ok?'':' en '+nf0.format(Math.round(at)))));
+    $('tirasub').append(sp);
   }
   rows.forEach((r,i)=>{
     const tr=el('tr',(i===nowI?'now':'')+(i>=loI&&i<=hiI&&loI>=0?' inr':'')+(i===loI?' rlo':'')+(i===hiI?' rhi':''));
