@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a6b57">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="GGAL">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Posición GGAL</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+html{-webkit-text-size-adjust:100%}body{margin:0}
+/* Layout: una columna de lectura rápida. Resumen arriba, luego patas netas, gráfico de resultado al vencimiento y libro de operaciones. */
+:root{
+  --bg:#f3f5f3; --surface:#ffffff; --fg:#13201b; --muted:#5b6a64; --line:#d8dfda;
+  --accent:#0a6b57; --pos:#17794a; --neg:#b3302a; --warn:#9a6a00;
+  --font:'Schibsted Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1513; --surface:#151f1c; --fg:#e3ebe7; --muted:#8c9d95; --line:#25332e;
+  --accent:#4fcaa9; --pos:#4fca8c; --neg:#ff7b6f; --warn:#e3b341; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1513; --surface:#151f1c; --fg:#e3ebe7; --muted:#8c9d95; --line:#25332e;
+  --accent:#4fcaa9; --pos:#4fca8c; --neg:#ff7b6f; --warn:#e3b341; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.45;
+  padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+header{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end;justify-content:space-between}
+h1{font-size:26px;line-height:1.1;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+h1 small{display:block;font-size:13px;font-weight:500;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+h2{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:12px;font-weight:500;color:var(--fg)}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.pill.live::before{background:var(--pos)} .pill.snap::before{background:var(--warn)} .pill.err::before{background:var(--neg)} .pill.load::before{background:var(--accent)}
+button{font:inherit;font-size:13px;font-weight:500;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)} button:focus-visible,svg:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button[disabled]{opacity:.55;cursor:default}
+.msg{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:6px;padding:10px 12px;font-size:13px}
+.msg.err{border-left-color:var(--neg)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.kpi{background:var(--surface);padding:12px 14px;min-width:0}
+.kpi .l{font-size:12px;color:var(--muted);margin-bottom:2px}
+.kpi .v{font-family:var(--mono);font-size:19px;font-weight:500;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pos{color:var(--pos)} .neg{color:var(--neg)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{font-size:12px;font-weight:500;color:var(--muted);text-align:right;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+tr:last-child td{border-bottom:0}
+td.t{font-family:var(--font);font-weight:700}
+.tag{display:inline-block;font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:.05em;padding:1px 7px;border-radius:4px;border:1px solid var(--line);color:var(--muted);margin-right:8px}
+.tag.c{color:var(--accent);border-color:var(--accent)} .tag.p{color:var(--warn);border-color:var(--warn)}
+.chartbox{position:relative}
+svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.ax{stroke:var(--line);stroke-width:1} .zero{stroke:var(--muted);stroke-width:1;stroke-dasharray:4 3}
+.tick{fill:var(--muted);font-family:var(--mono);font-size:11px}
+.line{fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round}
+.fp{fill:var(--pos);opacity:.16} .fn{fill:var(--neg);opacity:.16}
+.kline{stroke:var(--muted);stroke-width:1;stroke-dasharray:2 3;opacity:.7}
+.klab{fill:var(--muted);font-family:var(--mono);font-size:10px}
+.be{fill:var(--surface);stroke:var(--accent);stroke-width:2}
+.spotl{stroke:var(--accent);stroke-width:1.5}.spott{fill:var(--accent);font-weight:500}
+.cursor{stroke:var(--fg);stroke-width:1;opacity:.5}
+.dot{fill:var(--accent)}
+.readout{font-family:var(--mono);font-size:13px;color:var(--muted);min-height:20px;margin-top:6px}
+.readout b{color:var(--fg);font-weight:500}
+.note{font-size:12.5px;color:var(--muted);margin:10px 0 0}
+.note a{color:var(--accent)}
+@media (max-width:520px){h1{font-size:22px}.kpi .v{font-size:17px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<div class="wrap">
+  <header>
+    <h1><small>Ciclo diciembre · vence 18/12/2026</small>Posición GGAL</h1>
+    <div class="status">
+      <span id="pill" class="pill snap">Copia guardada</span>
+      <span id="when"></span>
+      <button id="refresh" type="button">Actualizar</button>
+    </div>
+  </header>
+
+  <div id="msg" class="msg" hidden></div>
+
+  <section aria-label="Resumen">
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <section class="card" aria-label="Patas netas">
+    <h2>Patas netas</h2>
+    <div class="scroll"><table id="legs"></table></div>
+    <p class="note">Cantidad positiva es compra, negativa es venta. Cada contrato son 100 acciones. La prima promedio pondera todas las operaciones de la pata.</p>
+  </section>
+
+  <section class="card" aria-label="Resultado al vencimiento">
+    <h2>Resultado al vencimiento según precio de GGAL</h2>
+    <div class="chartbox"><svg id="chart" viewBox="0 0 760 320" role="img" tabindex="0" aria-label="Resultado de la posición al vencimiento"></svg></div>
+    <div class="readout" id="readout">Pasá el cursor por el gráfico para ver el resultado en cada precio.</div>
+    <p class="note">Incluye el efectivo ya cobrado o pagado por las primas, sin costos de cierre. Es el valor intrínseco al 18/12, no una valuación de mercado de hoy.</p>
+  </section>
+
+  <section class="card" aria-label="Operaciones">
+    <h2>Operaciones cargadas en la planilla</h2>
+    <div class="scroll"><table id="ops"></table></div>
+  </section>
+
+  <p class="note" id="foot"></p>
+</div>
+
+<script>
+(function(){
+const SHEET_ID='1ynqTZ7oebDYMEO7xlpOeq-WRKN01jpz17EM5qlLrwR0';
+const TAB='GGAL DI';
+const SHEET_URL='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/edit';
+const EXPIRY=new Date(2026,11,18);
+const MULT=100;
+// Copia de la planilla al 23/10/2026, se muestra hasta que se lea la planilla en vivo.
+const SNAP={asOf:'2026-10-23',rows:[
+ {fecha:'2026-10-19',kind:'CALL',qty:-150,k:6800,p:124,neto:1855498.8},
+ {fecha:'2026-10-19',kind:'CALL',qty:150,k:7400,p:57,neto:-857069.1},
+ {fecha:'2026-10-19',kind:'PUT',qty:100,k:5400,p:179,neto:-1794331.8},
+ {fecha:'2026-10-19',kind:'PUT',qty:100,k:6200,p:583,neto:-5844108.6},
+ {fecha:'2026-10-19',kind:'PUT',qty:-200,k:5800,p:345,neto:6883302}
+],acc:[],accCash:0,spot:6235,spotDate:'2026-10-23',hoy:-1349728.7,acum:243291.3};
+
+const $=id=>document.getElementById(id);
+const nf0=new Intl.NumberFormat('es-AR',{maximumFractionDigits:0});
+const nf2=new Intl.NumberFormat('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const money=v=>(v<0?'−':'')+'$'+nf0.format(Math.abs(Math.round(v)));
+const sgn=v=>v>0?'+'+nf0.format(v):v<0?'−'+nf0.format(-v):'0';
+const fdate=s=>{const [y,m,d]=s.split('-');return d+'/'+m+'/'+y};
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+
+let state={rows:SNAP.rows,acc:SNAP.acc,accCash:SNAP.accCash,spot:SNAP.spot,spotDate:SNAP.spotDate,hoy:SNAP.hoy,acum:SNAP.acum,source:'snap',at:SNAP.asOf};
+
+/* ---------- lectura de la planilla ---------- */
+function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function csv(text){
+  const out=[];let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++} else q=false } else cur+=c }
+    else if(c==='"') q=true;
+    else if(c===','){row.push(cur);cur=''}
+    else if(c==='\n'){row.push(cur);out.push(row);row=[];cur=''}
+    else if(c!=='\r') cur+=c;
+  }
+  if(cur!==''||row.length){row.push(cur);out.push(row)}
+  return out;
+}
+function num(v){
+  if(v==null)return null;let t=String(v).trim().replace(/\$/g,'').replace(/\s/g,'');
+  if(t===''||!/[0-9]/.test(t))return null;
+  if(t.indexOf(',')>=0) t=t.replace(/\./g,'').replace(',','.');
+  else if(/^-?\d{1,3}(\.\d{3})+$/.test(t)) t=t.replace(/\./g,'');
+  const n=parseFloat(t);return isFinite(n)?n:null;
+}
+function pdate(v){const m=String(v||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):null}
+function parseBlock(g){
+  // g: filas de BG:BX desde la fila 1. La fila 2 es el encabezado.
+  const hdr=[1,7,13].map(i=>String((g[1]||[])[i]||'').trim().toUpperCase());
+  if(hdr[0]!=='TIPO'||hdr[1]!=='TIPO'||hdr[2]!=='TIPO') throw {code:'format',message:'El bloque BG:BX de la hoja cambió de lugar o de formato.'};
+  const rows=[],acc=[];let accCash=0,fecha=null;
+  for(let r=2;r<g.length;r++){
+    const x=g[r];const d=pdate(x[0]);if(d)fecha=d;
+    [[1,'CALL'],[7,'PUT']].forEach(([o,kind])=>{
+      const t=String(x[o]||'').trim().toUpperCase();
+      const q=num(x[o+1]),k=num(x[o+2]),p=num(x[o+3]),n=num(x[o+5]);
+      if(t===kind&&q&&k&&p!=null) rows.push({fecha:fecha||'',kind:kind,qty:q,k:k,p:p,neto:n==null?-q*p*MULT:n});
+    });
+    const qa=num(x[14]),pa=num(x[15]),na=num(x[17]);
+    if(qa&&pa!=null){const nn=na==null?-qa*pa:na;acc.push({fecha:fecha||'',qty:qa,p:pa,neto:nn});accCash+=nn}
+  }
+  return {rows:rows,acc:acc,accCash:accCash};
+}
+function gviz(range){
+  return 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:csv&headers=0&sheet='+encodeURIComponent(TAB)+'&range='+range+'&_='+Date.now();
+}
+async function getCsv(range){
+  let res;
+  try{res=await fetch(gviz(range),{cache:'no-store'})}catch(e){throw {code:'network',message:'No hay conexión con Google Sheets.'}}
+  if(!res.ok) throw {code:'http',message:'Google Sheets respondió '+res.status+'.'};
+  const t=await res.text();
+  if(/^\s*<(!doctype|html)/i.test(t)) throw {code:'private',message:'La planilla no está compartida por enlace.'};
+  return csv(t);
+}
+async function readLive(){
+  const [g,s,h]=await Promise.all([getCsv('BG1:BX120'),getCsv('AC3:AD4').catch(()=>null),getCsv('M36:P37').catch(()=>null)]);
+  const out=parseBlock(g);
+  out.spot=null;out.spotDate=null;
+  if(s&&s[0]&&String(s[0][1]||'').trim().toLowerCase().startsWith('precio')){out.spot=num(s[0][0]);out.spotDate=s[1]?pdate(s[1][0]):null}
+  out.hoy=null;out.acum=null;
+  if(h&&h[0]&&h[1]&&/^resultado acumulado/i.test(String(h[0][0]||'').trim())&&/^resultado hoy/i.test(String(h[1][0]||'').trim())){out.acum=num(h[0][3]);out.hoy=num(h[1][3])}
+  out.at=Date.now();
+  try{localStorage.setItem('ggal-last',JSON.stringify(out))}catch(e){}
+  return out;
+}
+
+/* ---------- cálculo ---------- */
+function netLegs(rows){
+  const m=new Map();
+  rows.forEach(r=>{
+    const key=r.kind+'|'+r.k;
+    const g=m.get(key)||{kind:r.kind,k:r.k,qty:0,n:0,wp:0,wq:0,cash:0};
+    g.qty+=r.qty;g.n++;g.wp+=r.p*Math.abs(r.qty);g.wq+=Math.abs(r.qty);g.cash+=r.neto;m.set(key,g);
+  });
+  return [...m.values()].map(g=>({...g,p:g.wq?g.wp/g.wq:0})).sort((a,b)=>a.kind===b.kind?a.k-b.k:(a.kind==='CALL'?-1:1));
+}
+function analyze(st){
+  const legs=netLegs(st.rows).filter(l=>l.qty!==0);
+  const accQty=st.acc.reduce((s,a)=>s+a.qty,0);
+  const cash=st.rows.reduce((s,r)=>s+r.neto,0)+st.accCash;
+  const f=S=>{let v=cash+accQty*S;legs.forEach(l=>{const i=l.kind==='CALL'?Math.max(0,S-l.k):Math.max(0,l.k-S);v+=l.qty*MULT*i});return v};
+  const ks=legs.map(l=>l.k);
+  const kmin=ks.length?Math.min(...ks):5000,kmax=ks.length?Math.max(...ks):7000;
+  const lo=Math.max(0,Math.floor(kmin*0.8/100)*100),hi=Math.ceil(kmax*1.2/100)*100;
+  const slopeHi=accQty*1+legs.reduce((s,l)=>s+(l.kind==='CALL'?l.qty*MULT:0),0);
+  const pts=[0,...ks,hi*3].sort((a,b)=>a-b);
+  let mx=-Infinity,mn=Infinity;pts.forEach(S=>{const v=f(S);if(v>mx)mx=v;if(v<mn)mn=v});
+  const openUp=slopeHi!==0;
+  // break-evens: cruces de cero entre puntos de quiebre
+  const bes=[];
+  for(let i=0;i<pts.length-1;i++){
+    const a=pts[i],b=pts[i+1],fa=f(a),fb=f(b);
+    if(fa===0&&a>0)bes.push(a);
+    else if(fa*fb<0)bes.push(a+(0-fa)*(b-a)/(fb-fa));
+  }
+  const lastF=f(pts[pts.length-1]);
+  if(lastF===0&&pts[pts.length-1]<hi*3){}
+  return {legs,accQty,cash,f,lo,hi,mx,mn,openUp,slopeHi,bes:[...new Set(bes.map(v=>Math.round(v)))]};
+}
+
+/* ---------- dibujo ---------- */
+function render(){
+  const a=analyze(state);
+  // estado
+  const pill=$('pill'),when=$('when');
+  if(state.source==='live'){pill.className='pill live';pill.textContent='Leída de la planilla';when.textContent=new Date(state.at).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}
+  else if(state.source==='load'){pill.className='pill load';pill.textContent='Leyendo planilla…';when.textContent=''}
+  else {pill.className='pill snap';pill.textContent='Copia guardada';when.textContent='al '+fdate(state.at)}
+  // KPIs
+  const days=Math.max(0,Math.ceil((EXPIRY-new Date())/86400000));
+  const k=$('kpis');k.textContent='';
+  const add=(l,v,cls)=>{const d=el('div','kpi');d.append(el('div','l',l));d.append(el('div','v'+(cls?' '+cls:''),v));k.append(d)};
+  if(state.spot){const d=el('div','kpi');d.append(el('div','l','GGAL en la planilla'+(state.spotDate?' ('+fdate(state.spotDate)+')':'')));d.append(el('div','v','$'+nf0.format(state.spot)));k.append(d);
+    const e2=el('div','kpi');e2.append(el('div','l','Resultado si queda en ese precio'));const rv=a.f(state.spot);e2.append(el('div','v '+(rv>=0?'pos':'neg'),money(rv)));k.append(e2)}
+  if(state.hoy!=null){const d=el('div','kpi');d.append(el('div','l','Resultado hoy'));d.append(el('div','v '+(state.hoy>=0?'pos':'neg'),money(state.hoy)));k.append(d)}
+  if(state.acum!=null){const d=el('div','kpi');d.append(el('div','l','Resultado acumulado'));d.append(el('div','v '+(state.acum>=0?'pos':'neg'),money(state.acum)));k.append(d)}
+  add('Efectivo neto de primas',money(a.cash),a.cash>=0?'pos':'neg');
+  add('Peor resultado',a.mn===-Infinity?'—':money(a.mn),a.mn<0?'neg':'');
+  add('Mejor resultado',a.openUp&&a.slopeHi>0?'sin tope':money(a.mx),'pos');
+  add('Punto de equilibrio',a.bes.length?a.bes.map(v=>nf0.format(v)).join(' · '):'—');
+  add('Días al vencimiento',String(days));
+  // patas
+  const t=$('legs');t.textContent='';
+  const thr=el('tr');['Pata','Base','Cant. neta','Prima prom.','Op.','Efectivo'].forEach(h=>thr.append(el('th',null,h)));
+  const th=el('thead');th.append(thr);t.append(th);
+  const tb=el('tbody');
+  if(!a.legs.length){const r=el('tr');const c=el('td',null,'La planilla no tiene patas abiertas en este bloque.');c.colSpan=6;r.append(c);tb.append(r)}
+  const gl=netLegs(state.rows).filter(l=>l.qty!==0);
+  gl.forEach(l=>{
+    const r=el('tr');
+    const c0=el('td','t');const tag=el('span','tag '+(l.kind==='CALL'?'c':'p'),l.kind==='CALL'?'CALL':'PUT');c0.append(tag,document.createTextNode(l.qty>0?'Comprada':'Vendida'));
+    r.append(c0,el('td',null,nf0.format(l.k)));
+    const cq=el('td',l.qty>0?'pos':'neg',sgn(l.qty));r.append(cq);
+    r.append(el('td',null,nf2.format(l.p)),el('td',null,String(l.n)));
+    r.append(el('td',l.cash>=0?'pos':'neg',money(l.cash)));
+    tb.append(r);
+  });
+  if(a.accQty!==0){const r=el('tr');const c0=el('td','t');c0.append(el('span','tag','ACC'),document.createTextNode('Acciones'));r.append(c0,el('td',null,'—'),el('td',a.accQty>0?'pos':'neg',sgn(a.accQty)),el('td',null,'—'),el('td',null,String(state.acc.length)),el('td',state.accCash>=0?'pos':'neg',money(state.accCash)));tb.append(r)}
+  t.append(tb);
+  // operaciones
+  const o=$('ops');o.textContent='';
+  const hr=el('tr');['Fecha','Pata','Cant.','Base','Prima','Efectivo'].forEach(h=>hr.append(el('th',null,h)));
+  const oh=el('thead');oh.append(hr);o.append(oh);
+  const ob=el('tbody');
+  state.rows.concat(state.acc.map(x=>({...x,kind:'ACC',k:null}))).forEach(r=>{
+    const tr=el('tr');
+    tr.append(el('td',null,r.fecha?fdate(r.fecha):'—'));
+    const c=el('td','t');c.append(el('span','tag '+(r.kind==='CALL'?'c':r.kind==='PUT'?'p':''),r.kind));tr.append(c);
+    tr.append(el('td',r.qty>0?'pos':'neg',sgn(r.qty)),el('td',null,r.k==null?'—':nf0.format(r.k)),el('td',null,nf2.format(r.p)),el('td',r.neto>=0?'pos':'neg',money(r.neto)));
+    ob.append(tr);
+  });
+  o.append(ob);
+  drawChart(a);
+  $('foot').textContent='Fuente: hoja "'+TAB+'", bloque BG:BX de la planilla EPGB DI-FE. ';
+  const lk=document.createElement('a');lk.href=SHEET_URL;lk.target='_blank';lk.rel='noopener';lk.textContent='Abrir planilla';$('foot').append(lk);
+}
+
+function drawChart(a){
+  const svg=$('chart');svg.textContent='';
+  const NS='http://www.w3.org/2000/svg';
+  const mk=(n,at,tx)=>{const e=document.createElementNS(NS,n);for(const k in at)e.setAttribute(k,at[k]);if(tx!=null)e.textContent=tx;svg.append(e);return e};
+  const W=760,H=320,L=64,R=16,T=14,B=30;
+  const xs=a.lo,xe=a.hi;
+  const X=S=>L+(S-xs)/(xe-xs)*(W-L-R);
+  const N=160,ys=[];for(let i=0;i<=N;i++){ys.push(a.f(xs+(xe-xs)*i/N))}
+  // incluye quiebres exactos para que las rectas no se redondeen
+  const grid=[];for(let i=0;i<=N;i++)grid.push(xs+(xe-xs)*i/N);
+  a.legs.forEach(l=>{if(l.k>=xs&&l.k<=xe)grid.push(l.k)});grid.sort((p,q)=>p-q);
+  const vals=grid.map(S=>a.f(S));
+  let vmin=Math.min(...vals,0),vmax=Math.max(...vals,0);
+  const pad=(vmax-vmin)*0.08||1;vmin-=pad;vmax+=pad;
+  const Y=v=>T+(vmax-v)/(vmax-vmin)*(H-T-B);
+  // eje Y con 5 marcas
+  const step=niceStep((vmax-vmin)/4);
+  for(let v=Math.ceil(vmin/step)*step;v<=vmax;v+=step){
+    mk('line',{x1:L,x2:W-R,y1:Y(v),y2:Y(v),class:'ax'});
+    mk('text',{x:L-8,y:Y(v)+4,'text-anchor':'end',class:'tick'},(v<0?'−':'')+nf2.format(Math.abs(v)/1e6).replace(/,00$/,'')+' M');
+  }
+  const path=grid.map((S,i)=>(i?'L':'M')+X(S).toFixed(1)+' '+Y(vals[i]).toFixed(1)).join('');
+  const y0=Y(0);
+  const defs=mk('defs',{});
+  const cp=(id,y,h)=>{const c=document.createElementNS(NS,'clipPath');c.setAttribute('id',id);const r=document.createElementNS(NS,'rect');r.setAttribute('x',L);r.setAttribute('width',W-L-R);r.setAttribute('y',y);r.setAttribute('height',Math.max(0,h));c.append(r);defs.append(c)};
+  cp('cu',T,y0-T);cp('cd',y0,H-B-y0);
+  const area=path+'L'+X(grid[grid.length-1]).toFixed(1)+' '+y0.toFixed(1)+'L'+X(grid[0]).toFixed(1)+' '+y0.toFixed(1)+'Z';
+  mk('path',{d:area,class:'fp','clip-path':'url(#cu)'});
+  mk('path',{d:area,class:'fn','clip-path':'url(#cd)'});
+  mk('line',{x1:L,x2:W-R,y1:y0,y2:y0,class:'zero'});
+  // bases
+  a.legs.forEach(l=>{if(l.k>xs&&l.k<xe){mk('line',{x1:X(l.k),x2:X(l.k),y1:T,y2:H-B,class:'kline'});}});
+  const seen=new Set();
+  a.legs.forEach(l=>{if(l.k>xs&&l.k<xe&&!seen.has(l.k)){seen.add(l.k);mk('text',{x:X(l.k),y:H-B+14,'text-anchor':'middle',class:'klab'},nf0.format(l.k))}});
+  if(state.spot&&state.spot>xs&&state.spot<xe){mk('line',{x1:X(state.spot),x2:X(state.spot),y1:T,y2:H-B,class:'spotl'});mk('text',{x:X(state.spot)+5,y:T+11,class:'klab spott'},'hoy '+nf0.format(state.spot))}
+  mk('path',{d:path,class:'line'});
+  a.bes.forEach(b=>{if(b>xs&&b<xe)mk('circle',{cx:X(b),cy:y0,r:4.5,class:'be'})});
+  mk('text',{x:L,y:H-4,class:'tick'},'Precio de GGAL al vencimiento: '+nf0.format(xs)+' a '+nf0.format(xe));
+  // cursor
+  const cur=mk('line',{x1:0,x2:0,y1:T,y2:H-B,class:'cursor',visibility:'hidden'});
+  const dot=mk('circle',{cx:0,cy:0,r:4,class:'dot',visibility:'hidden'});
+  const ro=$('readout');
+  const idle='Pasá el cursor por el gráfico para ver el resultado en cada precio.';
+  function at(ev){
+    const r=svg.getBoundingClientRect();const px=(ev.clientX-r.left)/r.width*W;
+    const S=Math.min(xe,Math.max(xs,xs+(px-L)/(W-L-R)*(xe-xs)));
+    const v=a.f(S);
+    cur.setAttribute('x1',X(S));cur.setAttribute('x2',X(S));cur.setAttribute('visibility','visible');
+    dot.setAttribute('cx',X(S));dot.setAttribute('cy',Y(v));dot.setAttribute('visibility','visible');
+    ro.textContent='';const b1=el('b',null,'GGAL '+nf0.format(Math.round(S)));const b2=el('b',v>=0?'pos':'neg',money(v));
+    ro.append(b1,document.createTextNode('  →  resultado '),b2);
+  }
+  svg.onpointermove=at;svg.onpointerdown=at;
+  svg.onpointerleave=()=>{cur.setAttribute('visibility','hidden');dot.setAttribute('visibility','hidden');ro.textContent=idle};
+}
+function niceStep(raw){const p=Math.pow(10,Math.floor(Math.log10(raw)));const m=raw/p;return (m<=1?1:m<=2?2:m<=5?5:10)*p}
+
+/* ---------- carga ---------- */
+function showErr(e){
+  const m=$('msg');m.hidden=false;const c=e&&e.code;
+  m.className='msg'+(c==='private'||c==='format'?' err':'');
+  let txt;
+  if(c==='private') txt='La planilla no permite lectura por enlace. En Google Sheets: Compartir, Acceso general, "Cualquier persona con el enlace", rol Lector. Mientras tanto se muestra la última lectura.';
+  else if(c==='network') txt='Sin conexión. Se muestra la última lectura guardada en este teléfono.';
+  else txt=(e&&e.message?e.message:'No se pudo leer la planilla.')+' Se muestra la última lectura.';
+  m.textContent=txt;
+}
+let busy=false;
+async function load(){
+  if(busy)return;busy=true;$('refresh').disabled=true;
+  const prev=state.source;state.source='load';render();
+  try{
+    const r=await readLive();
+    state={rows:r.rows,acc:r.acc,accCash:r.accCash,spot:r.spot,spotDate:r.spotDate,hoy:r.hoy,acum:r.acum,source:'live',at:r.at};
+    $('msg').hidden=true;
+  }catch(e){
+    state.source=prev==='live'?'live':'snap';if(prev==='live')state.stale=true;
+    showErr(e);
+  }
+  busy=false;$('refresh').disabled=false;render();
+}
+$('refresh').addEventListener('click',load);
+render();
+try{const L=JSON.parse(localStorage.getItem('ggal-last')||'null');if(L&&L.rows){state={rows:L.rows,acc:L.acc||[],accCash:L.accCash||0,spot:L.spot||null,spotDate:L.spotDate||null,hoy:L.hoy==null?null:L.hoy,acum:L.acum==null?null:L.acum,source:'live',at:L.at};render()}}catch(e){}
+load();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
+window.addEventListener('pageshow',e=>{if(e.persisted)load()});
+window.addEventListener('focus',()=>load());
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body></html>
