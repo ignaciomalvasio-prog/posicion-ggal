@@ -561,7 +561,7 @@ load();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
 let rz=0;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(!busy)render()},150)});
 window.addEventListener('pageshow',e=>{if(e.persisted)load()});
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker' in navigator){const had=!!navigator.serviceWorker.controller;let rl=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!rl){rl=true;location.reload()}});navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{})}
 })();
 </script>
 </body></html>
