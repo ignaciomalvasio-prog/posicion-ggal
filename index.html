@@ -206,6 +206,22 @@ tr.inr td{background-color:color-mix(in srgb,var(--gold) 4%,transparent)}
 tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
 .rtag{font:700 9px var(--sans);letter-spacing:.1em;color:var(--gold);margin-left:8px;border:1px solid color-mix(in srgb,var(--gold) 50%,transparent);border-radius:5px;padding:1px 5px}
 @media (max-width:560px){.rtag{margin-left:5px;padding:0 4px;font-size:8.5px}}
+
+.rtag{margin:0 8px 0 0}
+@media (max-width:560px){
+  .tira{overflow-x:hidden}
+  table{table-layout:auto}
+  th{padding:9px 6px;font-size:9.5px;letter-spacing:.04em}
+  td{padding:7px 6px;font-size:11.5px}
+  .rtag{margin:0 5px 0 0;padding:0 3px;font-size:8px;letter-spacing:.04em}
+}
+
+@media (max-width:380px){
+  th{padding:8px 4px;font-size:8.5px;letter-spacing:.02em}
+  td{padding:6px 4px;font-size:10.5px}
+  .rtag{margin-right:3px;font-size:7px;padding:0 2px}
+  .card{padding:14px 10px}
+}
 </style></head><body>
 <div class="wrap">
   <header>
@@ -482,9 +498,9 @@ function drawTira(a){
   rows.forEach((r,i)=>{
     const tr=el('tr',(i===nowI?'now':'')+(i>=loI&&i<=hiI&&loI>=0?' inr':'')+(i===loI?' rlo':'')+(i===hiI?' rhi':''));
     const c0=el('td','mono',nf0.format(Math.round(r.price)));if(i===nowI)c0.append(el('span','nowtag','hoy'));
-    if(i===loI||i===hiI)c0.append(el('span','rtag',i===loI?'−10%':'+10%'));tr.append(c0);
+    tr.append(c0);
     const pc=state.spot?(r.price/state.spot-1)*100:null;
-    tr.append(el('td','mono '+(pc==null?'':cls(pc)),pc==null?'':(pc>0?'+':pc<0?'−':'')+nf1.format(Math.abs(pc))+'%'));
+    const vt=el('td','mono '+(pc==null?'':cls(pc)),pc==null?'':(pc>0?'+':pc<0?'−':'')+nf1.format(Math.abs(pc))+'%');if(i===loI||i===hiI)vt.prepend(el('span','rtag',i===loI?'−10%':'+10%'));tr.append(vt);
     const f=el('td','bar mono '+cls(r.fin),money(r.fin));f.style.setProperty('--w',Math.round(Math.abs(r.fin)/mf*100)+'%');
     const o=el('td','bar mono '+cls(r.teo),money(r.teo));o.style.setProperty('--w',Math.round(Math.abs(r.teo)/mt*100)+'%');
     tr.append(f,o);tb.append(tr);
