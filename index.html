@@ -196,6 +196,16 @@ tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
 .fp,.fn{opacity:.08}
 .zero{opacity:.45}
 footer{letter-spacing:.02em;opacity:.8}
+
+/* regla de oro ±10% */
+tr.inr td:first-child{box-shadow:inset 3px 0 0 color-mix(in srgb,var(--gold) 55%,transparent)}
+tr.now.inr td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
+tr.rlo td{border-top:1.5px solid var(--gold)}
+tr.rhi td{border-bottom:1.5px solid var(--gold)}
+tr.inr td{background-color:color-mix(in srgb,var(--gold) 4%,transparent)}
+tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
+.rtag{font:700 9px var(--sans);letter-spacing:.1em;color:var(--gold);margin-left:8px;border:1px solid color-mix(in srgb,var(--gold) 50%,transparent);border-radius:5px;padding:1px 5px}
+@media (max-width:560px){.rtag{margin-left:5px;padding:0 4px;font-size:8.5px}}
 </style></head><body>
 <div class="wrap">
   <header>
@@ -461,10 +471,18 @@ function drawTira(a){
   const mf=Math.max(...rows.map(r=>Math.abs(r.fin)),1),mt=Math.max(...rows.map(r=>Math.abs(r.teo)),1);
   let nowI=-1;
   if(state.spot){let best=Infinity;rows.forEach((r,i)=>{const d=Math.abs(r.price-state.spot);if(d<best){best=d;nowI=i}});if(best>state.spot*0.01)nowI=-1}
+  const pcOf=r=>state.spot?(r.price/state.spot-1)*100:null;
+  let loI=-1,hiI=-1;
+  if(state.spot){rows.forEach((r,i)=>{const q=pcOf(r);if(q>=-10.05&&loI<0)loI=i;if(q<=10.05)hiI=i});}
+  const covers=state.spot&&pcOf(rows[0])<=-10&&pcOf(rows[rows.length-1])>=10;
+  if(state.spot&&loI>=0&&hiI>=loI){
+    let mn=Infinity;for(let i=loI;i<=hiI;i++)mn=Math.min(mn,rows[i].fin);
+    $('tirasub').textContent+=' · Regla ±10%: '+(covers?'cubierta':'la tabla no llega a ±10%')+' · peor Finish en el rango '+money(mn);
+  }
   rows.forEach((r,i)=>{
-    const tr=el('tr',i===nowI?'now':'');
+    const tr=el('tr',(i===nowI?'now':'')+(i>=loI&&i<=hiI&&loI>=0?' inr':'')+(i===loI?' rlo':'')+(i===hiI?' rhi':''));
     const c0=el('td','mono',nf0.format(Math.round(r.price)));if(i===nowI)c0.append(el('span','nowtag','hoy'));
-    tr.append(c0);
+    if(i===loI||i===hiI)c0.append(el('span','rtag',i===loI?'−10%':'+10%'));tr.append(c0);
     const pc=state.spot?(r.price/state.spot-1)*100:null;
     tr.append(el('td','mono '+(pc==null?'':cls(pc)),pc==null?'':(pc>0?'+':pc<0?'−':'')+nf1.format(Math.abs(pc))+'%'));
     const f=el('td','bar mono '+cls(r.fin),money(r.fin));f.style.setProperty('--w',Math.round(Math.abs(r.fin)/mf*100)+'%');
