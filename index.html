@@ -223,12 +223,21 @@ tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
   .card{padding:14px 10px}
 }
 .unc{color:var(--neg);font-weight:800}
+
+.ttl{display:flex;align-items:baseline;gap:10px;min-width:0}
+.ny{display:inline-flex;align-items:baseline;gap:5px;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px;font-weight:500;white-space:nowrap}
+.ny b{font:700 9px var(--sans);letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+.ny.pos{color:var(--pos)}.ny.neg{color:var(--neg)}
+@media (max-width:380px){.ny{font-size:12px}.ttl{gap:7px}}
+
+.brand{flex:1}
+@media (max-width:400px){.ny .ar{display:none}.pill{padding:4px 9px;font-size:11px;gap:6px}.status{gap:6px}.ny b{font-size:8px;letter-spacing:.1em}}
 </style></head><body>
 <div class="wrap">
   <header>
     <div class="brand">
       <div class="mark" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 30 30"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f1d9a0"/><stop offset="1" stop-color="#b98a3e"/></linearGradient></defs><path d="M3 15 H8.5 L13 5 L17 15 H21 L26 25 H27.5" fill="none" stroke="url(#lg)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19" cy="15" r="2.2" fill="#0c1014" stroke="#f1d9a0" stroke-width="1.4"/></svg></div>
-      <div><h1>GGAL</h1><small>Posición · vto 18/12/2026</small></div>
+      <div><div class="ttl"><h1>GGAL</h1><span id="ny" class="ny" hidden></span></div><small>Posición · vto 18/12/2026</small></div>
     </div>
     <div class="status">
       <span id="when" class="when"></span>
@@ -568,8 +577,32 @@ async function load(){
     state={rows:r.rows,acc:r.acc,accCash:r.accCash,spot:r.spot||state.spot,spotDate:r.spotDate||state.spotDate,hoy:r.hoy,acum:r.acum,tira:r.tira||state.tira,source:'live',at:r.at};
     $('msg').hidden=true;
   }catch(e){state.source=prev==='live'?'live':'snap';showErr(e)}
-  busy=false;btn.disabled=false;btn.classList.remove('spin');render();
+  busy=false;btn.disabled=false;btn.classList.remove('spin');render();loadNY();
 }
+
+/* GGAL en Nueva York (pre / post / rueda), solo variación % — fuente CNBC, abierta a navegadores */
+const NY_URL='https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=GGAL&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json';
+let nyBusy=false;
+function pnum(x){const n=parseFloat(String(x==null?'':x).replace(/[^0-9.\-+]/g,''));return isFinite(n)?n:null}
+async function loadNY(){
+  if(nyBusy)return;nyBusy=true;const n=$('ny');
+  try{
+    const c=new AbortController();const to=setTimeout(()=>c.abort(),8000);
+    const r=await fetch(NY_URL,{signal:c.signal,cache:'no-store'});clearTimeout(to);
+    const q=(await r.json()).FormattedQuoteResult.FormattedQuote[0];
+    let label='NY',pct=pnum(q.change_pct);
+    const e=q.ExtendedMktQuote;
+    if(e&&pnum(e.change_pct)!=null&&/PRE|POST/i.test(e.type||'')){label=/PRE/i.test(e.type)?'Pre':'Post';pct=pnum(e.change_pct)}
+    else if(q.curmktstatus&&!/REG/i.test(q.curmktstatus))label='Cierre';
+    if(pct==null)throw 0;
+    n.className='ny '+cls(pct);n.textContent='';
+    const b=document.createElement('b');b.textContent=label;
+    const ar=document.createElement('span');ar.className='ar';ar.textContent=pct>0?'▲ ':pct<0?'▼ ':'';n.append(b,ar,document.createTextNode((pct>0?'+':pct<0?'−':'')+nf2.format(Math.abs(pct))+'%'));
+    n.title='GGAL en Nueva York ('+label.toLowerCase()+')';n.hidden=false;
+  }catch(e){/* sin dato: se deja lo último o queda oculto */}
+  nyBusy=false;
+}
+loadNY();setInterval(()=>{if(!document.hidden)loadNY()},60000);
 $('tiraBox').addEventListener('scroll',()=>{if(!prog)userScrolled=true});
 $('refresh').addEventListener('click',load);
 $('msgx').addEventListener('click',()=>{$('msg').hidden=true});
