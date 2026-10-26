@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "moneda": "ARS",
+  "opex": [
+    {
+      "id": "2026-10",
+      "nombre": "Octubre 2026",
+      "desde": "2026-08-24",
+      "hasta": "2026-10-16",
+      "nota": "Posición en GGAL cerrada.",
+      "lineas": [
+        {
+          "k": "Primas netas de opciones (bruto)",
+          "v": 4657399
+        },
+        {
+          "k": "Ejercicios y asignaciones (neto)",
+          "v": -22440000
+        },
+        {
+          "k": "Compra/venta de acciones GGAL (incl. cierre del corto)",
+          "v": 20135000
+        },
+        {
+          "k": "Comisiones y derechos de mercado",
+          "v": -265908
+        },
+        {
+          "k": "Cauciones (intereses netos, aranceles y retención)",
+          "v": -13928
+        },
+        {
+          "k": "Plan Flat",
+          "v": -205700
+        }
+      ],
+      "saldoInicio": 1792092,
+      "saldoCierre": 3658955,
+      "donacion": {
+        "pct": 10,
+        "realizada": 73000,
+        "detalle": "Donación realizada 30/09/2026"
+      }
+    }
+  ]
+}
