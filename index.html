@@ -696,14 +696,24 @@ async function loadNY(){
     const c=new AbortController();const to=setTimeout(()=>c.abort(),8000);
     const r=await fetch(NY_URL,{signal:c.signal,cache:'no-store'});clearTimeout(to);
     const q=(await r.json()).FormattedQuoteResult.FormattedQuote[0];
-    let label='NY',pct=pnum(q.change_pct);
+    const st=String(q.curmktstatus||'');
     const e=q.ExtendedMktQuote;
-    if(e&&pnum(e.change_pct)!=null&&/PRE|POST/i.test(e.type||'')){label=/PRE/i.test(e.type)?'Pre':'Post';pct=pnum(e.change_pct)}
-    else if(q.curmktstatus&&!/REG/i.test(q.curmktstatus))label='Cierre';
+    const ep=e?pnum(e.change_pct):null;
+    const isPre=e&&/PRE/i.test(e.type||''),isPost=e&&/POST/i.test(e.type||'');
+    const dayOf=x=>String(x||'').slice(0,10);
+    // horario de BYMA: lunes a viernes de 11:00 a 17:00 (hora de Argentina, UTC-3)
+    const ar=new Date(Date.now()-3*3600e3),wd=ar.getUTCDay(),hm=ar.getUTCHours()*60+ar.getUTCMinutes();
+    const byma=wd>=1&&wd<=5&&hm>=11*60&&hm<17*60;
+    let label='NY',pct=pnum(q.change_pct);
+    if(/REG/i.test(st)){/* rueda regular en Nueva York: el cambio del día, aunque haya un pre viejo */}
+    else if(/PRE/i.test(st)&&isPre&&ep!=null){pct=ep;label=byma?'NY':'Pre'}
+    else if(/POST/i.test(st)&&isPost&&ep!=null){pct=ep;label=byma?'NY':'Post'}
+    else if(isPost&&ep!=null&&dayOf(e.last_time)===dayOf(q.last_time)){pct=ep;label=byma?'NY':'Post'}
+    else if(!byma)label='Cierre';
     if(pct==null)throw 0;
     n.className='ny '+cls(pct);n.textContent='';
     const b=document.createElement('b');b.textContent=label;
-    const ar=document.createElement('span');ar.className='ar';ar.textContent=pct>0?'▲ ':pct<0?'▼ ':'';n.append(b,ar,document.createTextNode((pct>0?'+':pct<0?'−':'')+nf2.format(Math.abs(pct))+'%'));
+    const arw=document.createElement('span');arw.className='ar';arw.textContent=pct>0?'▲ ':pct<0?'▼ ':'';n.append(b,arw,document.createTextNode((pct>0?'+':pct<0?'−':'')+nf2.format(Math.abs(pct))+'%'));
     n.title='GGAL en Nueva York ('+label.toLowerCase()+')';n.hidden=false;
   }catch(e){/* sin dato: se deja lo último o queda oculto */}
   nyBusy=false;
