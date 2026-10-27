@@ -246,6 +246,14 @@ tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
 .okc{color:var(--pos)}.badc{color:var(--neg);font-weight:700}
 .onote{padding:10px 14px 12px;font-size:12px;color:var(--muted)}
 @media (max-width:380px){.kv{padding:8px 10px;font-size:12px}.kv .m{font-size:12px}}
+
+.gk{gap:3px;padding:15px 8px 13px}
+.gk .v{font-size:clamp(19px,5.4vw,24px)}
+.gh{font-size:10.5px;color:var(--muted);letter-spacing:.01em}
+.gs{display:flex;justify-content:center;gap:10px;margin-top:7px;padding-top:8px;border-top:1px solid var(--line);width:100%;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:11.5px;color:var(--fg);flex-wrap:wrap}
+.gs i{font:700 8.5px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-style:normal}
+.gs{flex-direction:column;align-items:center;gap:3px}
+.gk{justify-content:flex-start}
 </style></head><body>
 <div class="wrap">
   <header>
@@ -281,6 +289,11 @@ tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
     <div class="tira" id="tiraBox"><table id="tira"></table></div>
   </section>
 
+  <section class="card" aria-label="Griegas">
+    <div class="card-h"><h2>Griegas</h2><span class="sub">Posición total, con el aporte de calls y puts</span></div>
+    <div class="grid2" id="greeks"></div>
+  </section>
+
   <section class="card" aria-label="Patas netas">
     <div class="card-h"><h2>Patas netas</h2><span class="sub">Cada contrato son 100 acciones</span></div>
     <div class="legs" id="legs"></div>
@@ -311,7 +324,7 @@ const SNAP={asOf:'2026-10-23',rows:[
  {fecha:'2026-10-19',kind:'PUT',qty:100,k:5400,p:179,neto:-1794331.8},
  {fecha:'2026-10-19',kind:'PUT',qty:100,k:6200,p:583,neto:-5844108.6},
  {fecha:'2026-10-19',kind:'PUT',qty:-200,k:5800,p:345,neto:6883302}
-],acc:[],accCash:0,spot:6235,spotDate:'2026-10-23',hoy:-1349728.7,acum:243291.3,
+],acc:[],accCash:0,greeks:{delta:{g:-3722,c:-3117.11,p:-604.89},gamma:{g:-3.11,c:-2.80,p:-0.31},vega:{g:-58674.21,c:-52811.49,p:-5862.72},theta:{g:29160.75,c:24998.52,p:4162.24}},spot:6235,spotDate:'2026-10-23',hoy:-1349728.7,acum:243291.3,
 tira:[[4604.98, 243291.3, 464008.6], [4698.96, 243291.3, 480569.6], [4794.85, 243291.3, 490209.3], [4892.71, 243291.3, 489968.5], [4992.56, 243291.3, 476527.1], [5094.45, 243291.3, 446292.1], [5198.42, 243291.3, 395517.8], [5304.51, 243291.3, 320454.9], [5412.76, 370918.3, 217522.3], [5523.23, 1475563.7, 83493.4], [5635.95, 2602753.0, -84312.8], [5750.97, 3752946.1, -287850.6], [5868.33, 3559970.1, -528185.5], [5988.09, 2362351.3, -805367.0], [6110.3, 1140291.3, -1118344.9], [6235, 243291.3, -1464937.6], [6359.7, 243291.3, -1834126.3], [6486.89, 243291.3, -2228411.0], [6616.63, 243291.3, -2642930.4], [6748.96, 243291.3, -3072178.9], [6883.94, -1015865.8, -3510210.6], [7021.62, -3081049.0, -3950865.4], [7162.06, -5187535.8, -4388003.5], [7305.3, -7336152.3, -4815735.5], [7451.4, -8756708.7, -5228632.8], [7600.43, -8756708.7, -5621908.5], [7752.44, -8756708.7, -5991558.2], [7907.49, -8756708.7, -6334455.5], [8065.64, -8756708.7, -6648398.0], [8226.95, -8756708.7, -6932107.5], [8391.49, -8756708.7, -7185184.8], [8559.32, -8756708.7, -7408029.0]].map(t=>({price:t[0],fin:t[1],teo:t[2]}))};
 
 const $=id=>document.getElementById(id);
@@ -326,7 +339,7 @@ const DOW=['domingo','lunes','martes','miércoles','jueves','viernes','sábado']
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
 const cls=v=>v>0?'pos':v<0?'neg':'';
 
-let state={rows:SNAP.rows,acc:SNAP.acc,accCash:SNAP.accCash,spot:SNAP.spot,spotDate:SNAP.spotDate,hoy:SNAP.hoy,acum:SNAP.acum,tira:SNAP.tira,source:'snap',at:SNAP.asOf};
+let state={greeks:SNAP.greeks,rows:SNAP.rows,acc:SNAP.acc,accCash:SNAP.accCash,spot:SNAP.spot,spotDate:SNAP.spotDate,hoy:SNAP.hoy,acum:SNAP.acum,tira:SNAP.tira,source:'snap',at:SNAP.asOf};
 const open=new Set();let showFin=true,showTeo=true;
 
 /* ---------- lectura de la planilla ---------- */
@@ -380,13 +393,15 @@ async function getCsv(range){
   return csv(t);
 }
 async function readLive(){
-  const [g,s,h,t]=await Promise.all([getCsv('BG1:BX120'),getCsv('AC1:AD8').catch(()=>null),getCsv('M34:P40').catch(()=>null),getCsv('M2:P36').catch(()=>null)]);
+  const [g,s,h,t,gr]=await Promise.all([getCsv('BG1:BX120'),getCsv('AC1:AD8').catch(()=>null),getCsv('M34:P40').catch(()=>null),getCsv('M2:P36').catch(()=>null),getCsv('M42:P52').catch(()=>null)]);
   const out=parseBlock(g);
   out.spot=null;out.spotDate=null;out.hoy=null;out.acum=null;out.tira=null;
   const find=(rows,re,c)=>(rows||[]).find(x=>re.test(String(x[c]||'').trim()));
   if(s){const p=find(s,/^precio/i,1),f=find(s,/^fecha actual/i,1);if(p)out.spot=num(p[0]);if(f)out.spotDate=pdate(f[0])}
   if(h){const a=find(h,/^resultado acumulado/i,0),y=find(h,/^resultado hoy/i,0);if(a)out.acum=num(a[3]);if(y)out.hoy=num(y[3])}
   if(t){const tr=[];t.forEach(x=>{const p=num(x[1]),f=num(x[2]),o=num(x[3]);if(p&&p>100&&f!=null&&o!=null)tr.push({price:p,fin:f,teo:o})});if(tr.length>=5)out.tira=tr}
+  out.greeks=null;
+  if(gr){const G={};[['delta',/^delta/i],['gamma',/^gamma/i],['vega',/^vega/i],['theta',/^theta/i]].forEach(([k,re])=>{const x=find(gr,re,0);if(x){const a=num(x[1]),b=num(x[2]),c=num(x[3]);if(a!=null)G[k]={g:a,c:b,p:c}}});if(Object.keys(G).length===4)out.greeks=G}
   out.at=Date.now();
   try{localStorage.setItem('ggal-last',JSON.stringify(out))}catch(e){}
   return out;
@@ -441,7 +456,7 @@ function render(){
   add('Peor resultado',money(a.mn),cls(a.mn));
   add('Mejor resultado',a.openUp&&a.slopeHi>0?'sin tope':money(a.mx),'pos');
   add('Equilibrio',a.bes.length?a.bes.map(v=>nf0.format(v)).join(' · '):'—','');
-  drawChart(a);drawTira(a);drawLegs(a);drawDays();
+  drawChart(a);drawTira(a);drawGreeks();drawLegs(a);drawDays();
   const f=$('foot');f.textContent='Datos de la hoja "'+TAB+'" de tu planilla EPGB DI-FE. ';
   const lk=el('a',null,'Abrir planilla');lk.href=SHEET_URL;lk.target='_blank';lk.rel='noopener';f.append(lk);
 }
@@ -542,6 +557,23 @@ function drawTira(a){
   else if(nowI>=0){const row=tb.children[nowI];const go=()=>{prog=true;box0.scrollTop=Math.max(0,row.getBoundingClientRect().top-box0.getBoundingClientRect().top+box0.scrollTop-box0.clientHeight/2+row.clientHeight/2);setTimeout(()=>{prog=false},60)};go();requestAnimationFrame(go)}
 }
 
+
+function drawGreeks(){
+  const box=$('greeks');box.textContent='';const G=state.greeks;
+  if(!G){box.append(el('div','sub','La planilla no devolvió las griegas.'));return}
+  const defs=[['delta','Delta',0,'acciones equivalentes'],['gamma','Gamma',2,'variación del delta'],['vega','Vega',0,'sensibilidad a la volatilidad'],['theta','Theta',0,'paso del tiempo']];
+  const f=(v,d)=>v==null?'—':(v<0?'−':v>0?'+':'')+new Intl.NumberFormat('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(Math.abs(v));
+  defs.forEach(([k,name,d,hint])=>{
+    const g=G[k];if(!g)return;
+    const c=el('div','stat gk');
+    c.append(el('div','l',name),el('div','v '+cls(g.g),f(g.g,d)),el('div','gh',hint));
+    const sp=el('div','gs');
+    const a=el('span');a.append(el('i',null,'Call'),document.createTextNode(' '+f(g.c,d)));
+    const b=el('span');b.append(el('i',null,'Put'),document.createTextNode(' '+f(g.p,d)));
+    sp.append(a,b);c.append(sp);box.append(c);
+  });
+}
+
 function drawLegs(a){
   const c=$('legs');c.textContent='';
   const gl=netLegs(state.rows).filter(l=>l.qty!==0);
@@ -593,7 +625,7 @@ async function load(){
   const prev=state.source;state.source='load';render();
   try{
     const r=await readLive();
-    state={rows:r.rows,acc:r.acc,accCash:r.accCash,spot:r.spot||state.spot,spotDate:r.spotDate||state.spotDate,hoy:r.hoy,acum:r.acum,tira:r.tira||state.tira,source:'live',at:r.at};
+    state={greeks:r.greeks||state.greeks,rows:r.rows,acc:r.acc,accCash:r.accCash,spot:r.spot||state.spot,spotDate:r.spotDate||state.spotDate,hoy:r.hoy,acum:r.acum,tira:r.tira||state.tira,source:'live',at:r.at};
     $('msg').hidden=true;
   }catch(e){state.source=prev==='live'?'live':'snap';showErr(e)}
   busy=false;btn.disabled=false;btn.classList.remove('spin');render();loadNY();loadOpex();
@@ -682,7 +714,7 @@ $('refresh').addEventListener('click',load);
 $('msgx').addEventListener('click',()=>{$('msg').hidden=true});
 $('tgFin').addEventListener('click',e=>{showFin=!showFin;if(!showFin&&!showTeo){showTeo=true;$('tgTeo').setAttribute('aria-pressed','true')}e.currentTarget.setAttribute('aria-pressed',String(showFin));render()});
 $('tgTeo').addEventListener('click',e=>{showTeo=!showTeo;if(!showFin&&!showTeo){showFin=true;$('tgFin').setAttribute('aria-pressed','true')}e.currentTarget.setAttribute('aria-pressed',String(showTeo));render()});
-try{const L=JSON.parse(localStorage.getItem('ggal-last')||'null');if(L&&L.rows){state={rows:L.rows,acc:L.acc||[],accCash:L.accCash||0,spot:L.spot||SNAP.spot,spotDate:L.spotDate||SNAP.spotDate,hoy:L.hoy==null?null:L.hoy,acum:L.acum==null?null:L.acum,tira:L.tira||SNAP.tira,source:'live',at:L.at}}}catch(e){}
+try{const L=JSON.parse(localStorage.getItem('ggal-last')||'null');if(L&&L.rows){state={greeks:L.greeks||SNAP.greeks,rows:L.rows,acc:L.acc||[],accCash:L.accCash||0,spot:L.spot||SNAP.spot,spotDate:L.spotDate||SNAP.spotDate,hoy:L.hoy==null?null:L.hoy,acum:L.acum==null?null:L.acum,tira:L.tira||SNAP.tira,source:'live',at:L.at}}}catch(e){}
 render();
 load();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
