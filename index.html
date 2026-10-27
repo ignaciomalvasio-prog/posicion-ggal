@@ -381,25 +381,27 @@ function parseBlock(g){
   }
   return {rows:rows,acc:acc,accCash:accCash};
 }
-function gviz(range){
-  return 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:csv&headers=0&sheet='+encodeURIComponent(TAB)+'&range='+range+'&_='+Date.now();
+function gviz(range,tab){
+  return 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:csv&headers=0&sheet='+encodeURIComponent(tab||TAB)+'&range='+range+'&_='+Date.now();
 }
-async function getCsv(range){
+async function getCsv(range,tab){
   let res;
-  try{res=await fetch(gviz(range),{cache:'no-store'})}catch(e){throw {code:'network',message:'No pude leer la planilla. Si tu conexión anda, revisá que esté compartida por enlace.'}}
+  try{res=await fetch(gviz(range,tab),{cache:'no-store'})}catch(e){throw {code:'network',message:'No pude leer la planilla. Si tu conexión anda, revisá que esté compartida por enlace.'}}
   if(!res.ok) throw {code:'http',message:'Google Sheets respondió '+res.status+'.'};
   const t=await res.text();
   if(/^\s*<(!doctype|html)/i.test(t)) throw {code:'private',message:'La planilla no permite lectura por enlace.'};
   return csv(t);
 }
 async function readLive(){
-  const [g,s,h,t,gr]=await Promise.all([getCsv('BG1:BX120'),getCsv('AC1:AD8').catch(()=>null),getCsv('M34:P40').catch(()=>null),getCsv('M2:P36').catch(()=>null),getCsv('M42:P52').catch(()=>null)]);
+  const [g,s,h,t,gr,md]=await Promise.all([getCsv('BG1:BX120'),getCsv('AC1:AD8').catch(()=>null),getCsv('M34:P40').catch(()=>null),getCsv('M2:P36').catch(()=>null),getCsv('M42:P52').catch(()=>null),getCsv('A1:K40','MD').catch(()=>null)]);
   const out=parseBlock(g);
   out.spot=null;out.spotDate=null;out.hoy=null;out.acum=null;out.tira=null;
   const find=(rows,re,c)=>(rows||[]).find(x=>re.test(String(x[c]||'').trim()));
   if(s){const p=find(s,/^precio/i,1),f=find(s,/^fecha actual/i,1);if(p)out.spot=num(p[0]);if(f)out.spotDate=pdate(f[0])}
   if(h){const a=find(h,/^resultado acumulado/i,0),y=find(h,/^resultado hoy/i,0);if(a)out.acum=num(a[3]);if(y)out.hoy=num(y[3])}
   if(t){const tr=[];t.forEach(x=>{const p=num(x[1]),f=num(x[2]),o=num(x[3]);if(p&&p>100&&f!=null&&o!=null)tr.push({price:p,fin:f,teo:o})});if(tr.length>=5)out.tira=tr}
+  out.prevClose=null;
+  if(md){const x=md.find(r=>String(r[0]||'').trim().toUpperCase()==='GGAL');if(x){const c=num(x[9]);if(c&&c>0)out.prevClose=c}}
   out.greeks=null;
   if(gr){const G={};[['delta',/^delta/i],['gamma',/^gamma/i],['vega',/^vega/i],['theta',/^theta/i]].forEach(([k,re])=>{const x=find(gr,re,0);if(x){const a=num(x[1]),b=num(x[2]),c=num(x[3]);if(a!=null)G[k]={g:a,c:b,p:c}}});if(Object.keys(G).length===4)out.greeks=G}
   out.at=Date.now();
@@ -625,6 +627,7 @@ async function load(){
   const prev=state.source;state.source='load';render();
   try{
     const r=await readLive();
+    if(r.prevClose)prevClose=r.prevClose;
     state={greeks:r.greeks||state.greeks,rows:r.rows,acc:r.acc,accCash:r.accCash,spot:r.spot||state.spot,spotDate:r.spotDate||state.spotDate,hoy:r.hoy,acum:r.acum,tira:r.tira||state.tira,source:'live',at:r.at};
     $('msg').hidden=true;
   }catch(e){state.source=prev==='live'?'live':'snap';showErr(e)}
@@ -688,34 +691,41 @@ loadOpex();
 
 /* GGAL en Nueva York (pre / post / rueda), solo variación % — fuente CNBC, abierta a navegadores */
 const NY_URL='https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=GGAL&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json';
-let nyBusy=false;
+let nyBusy=false,prevClose=null;
 function pnum(x){const n=parseFloat(String(x==null?'':x).replace(/[^0-9.\-+]/g,''));return isFinite(n)?n:null}
+function showChip(label,pct,title){
+  const n=$('ny');
+  if(pct==null||!isFinite(pct)){n.hidden=true;return}
+  n.className='ny '+cls(pct);n.textContent='';
+  const b=document.createElement('b');b.textContent=label;
+  const arw=document.createElement('span');arw.className='ar';arw.textContent=pct>0?'▲ ':pct<0?'▼ ':'';
+  n.append(b,arw,document.createTextNode((pct>0?'+':pct<0?'−':'')+nf2.format(Math.abs(pct))+'%'));
+  n.title=title||'';n.hidden=false;
+}
 async function loadNY(){
-  if(nyBusy)return;nyBusy=true;const n=$('ny');
+  if(nyBusy)return;nyBusy=true;
   try{
-    const c=new AbortController();const to=setTimeout(()=>c.abort(),8000);
-    const r=await fetch(NY_URL,{signal:c.signal,cache:'no-store'});clearTimeout(to);
-    const q=(await r.json()).FormattedQuoteResult.FormattedQuote[0];
-    const st=String(q.curmktstatus||'');
-    const e=q.ExtendedMktQuote;
-    const ep=e?pnum(e.change_pct):null;
-    const isPre=e&&/PRE/i.test(e.type||''),isPost=e&&/POST/i.test(e.type||'');
-    const dayOf=x=>String(x||'').slice(0,10);
-    // horario de BYMA: lunes a viernes de 11:00 a 17:00 (hora de Argentina, UTC-3)
+    // horario de BYMA: lunes a viernes de 10:30 a 17:00 (hora de Argentina, UTC-3)
     const ar=new Date(Date.now()-3*3600e3),wd=ar.getUTCDay(),hm=ar.getUTCHours()*60+ar.getUTCMinutes();
-    const byma=wd>=1&&wd<=5&&hm>=11*60&&hm<17*60;
-    let label='NY',pct=pnum(q.change_pct);
-    if(/REG/i.test(st)){/* rueda regular en Nueva York: el cambio del día, aunque haya un pre viejo */}
-    else if(/PRE/i.test(st)&&isPre&&ep!=null){pct=ep;label=byma?'NY':'Pre'}
-    else if(/POST/i.test(st)&&isPost&&ep!=null){pct=ep;label=byma?'NY':'Post'}
-    else if(isPost&&ep!=null&&dayOf(e.last_time)===dayOf(q.last_time)){pct=ep;label=byma?'NY':'Post'}
-    else if(!byma)label='Cierre';
-    if(pct==null)throw 0;
-    n.className='ny '+cls(pct);n.textContent='';
-    const b=document.createElement('b');b.textContent=label;
-    const arw=document.createElement('span');arw.className='ar';arw.textContent=pct>0?'▲ ':pct<0?'▼ ':'';n.append(b,arw,document.createTextNode((pct>0?'+':pct<0?'−':'')+nf2.format(Math.abs(pct))+'%'));
-    n.title='GGAL en Nueva York ('+label.toLowerCase()+')';n.hidden=false;
-  }catch(e){/* sin dato: se deja lo último o queda oculto */}
+    const byma=wd>=1&&wd<=5&&hm>=10*60+30&&hm<17*60;
+    // movimiento de BYMA: precio actual de la planilla contra el último cierre
+    const bp=(state.spot&&prevClose)?(state.spot/prevClose-1)*100:null;
+    if(byma){showChip('Hoy',bp,'Precio de la planilla contra el cierre anterior');nyBusy=false;return}
+    // fuera de rueda: pre / post de Nueva York (CNBC); si no hay, el cambio del último día de BYMA
+    let label='Cierre',pct=bp,ttl='Precio de la planilla contra el cierre anterior';
+    try{
+      const c=new AbortController();const to=setTimeout(()=>c.abort(),8000);
+      const r=await fetch(NY_URL,{signal:c.signal,cache:'no-store'});clearTimeout(to);
+      const q=(await r.json()).FormattedQuoteResult.FormattedQuote[0];
+      const st=String(q.curmktstatus||''),e=q.ExtendedMktQuote,ep=e?pnum(e.change_pct):null;
+      const isPre=e&&/PRE/i.test(e.type||''),isPost=e&&/POST/i.test(e.type||'');
+      const dayOf=x=>String(x||'').slice(0,10);
+      if(/PRE/i.test(st)&&isPre&&ep!=null){label='Pre';pct=ep;ttl='GGAL en Nueva York, pre-market'}
+      else if(/POST/i.test(st)&&isPost&&ep!=null){label='Post';pct=ep;ttl='GGAL en Nueva York, after-market'}
+      else if(!/REG/i.test(st)&&isPost&&ep!=null&&dayOf(e.last_time)===dayOf(q.last_time)){label='Post';pct=ep;ttl='GGAL en Nueva York, after-market'}
+    }catch(e){}
+    showChip(label,pct,ttl);
+  }catch(e){}
   nyBusy=false;
 }
 loadNY();setInterval(()=>{if(!document.hidden)loadNY()},60000);
@@ -724,7 +734,7 @@ $('refresh').addEventListener('click',load);
 $('msgx').addEventListener('click',()=>{$('msg').hidden=true});
 $('tgFin').addEventListener('click',e=>{showFin=!showFin;if(!showFin&&!showTeo){showTeo=true;$('tgTeo').setAttribute('aria-pressed','true')}e.currentTarget.setAttribute('aria-pressed',String(showFin));render()});
 $('tgTeo').addEventListener('click',e=>{showTeo=!showTeo;if(!showFin&&!showTeo){showFin=true;$('tgFin').setAttribute('aria-pressed','true')}e.currentTarget.setAttribute('aria-pressed',String(showTeo));render()});
-try{const L=JSON.parse(localStorage.getItem('ggal-last')||'null');if(L&&L.rows){state={greeks:L.greeks||SNAP.greeks,rows:L.rows,acc:L.acc||[],accCash:L.accCash||0,spot:L.spot||SNAP.spot,spotDate:L.spotDate||SNAP.spotDate,hoy:L.hoy==null?null:L.hoy,acum:L.acum==null?null:L.acum,tira:L.tira||SNAP.tira,source:'live',at:L.at}}}catch(e){}
+try{const L=JSON.parse(localStorage.getItem('ggal-last')||'null');if(L&&L.rows){if(L.prevClose)prevClose=L.prevClose;state={greeks:L.greeks||SNAP.greeks,rows:L.rows,acc:L.acc||[],accCash:L.accCash||0,spot:L.spot||SNAP.spot,spotDate:L.spotDate||SNAP.spotDate,hoy:L.hoy==null?null:L.hoy,acum:L.acum==null?null:L.acum,tira:L.tira||SNAP.tira,source:'live',at:L.at}}}catch(e){}
 render();
 load();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
