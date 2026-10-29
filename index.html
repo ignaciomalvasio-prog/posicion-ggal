@@ -254,6 +254,35 @@ tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
 .gs i{font:700 8.5px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-style:normal}
 .gs{flex-direction:column;align-items:center;gap:3px}
 .gk{justify-content:flex-start}
+
+/* patas netas compactas */
+.lg2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lcol{border:1px solid var(--line);border-radius:14px;background:var(--surface2);box-shadow:var(--hi);overflow:hidden;min-width:0;display:flex;flex-direction:column}
+.lh{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:10px 12px 8px;border-bottom:1px solid var(--line)}
+.lsub{font-size:11px;color:var(--muted)}
+.lempty{padding:14px 12px;font-size:12.5px;color:var(--muted);text-align:center}
+.lr{all:unset;box-sizing:border-box;cursor:pointer;display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:11px 12px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:15px;width:100%}
+.lr:hover,.lr:active{background:color-mix(in srgb,var(--gold) 7%,transparent)}
+.lr:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.lk{font-weight:500}.lq{font-weight:500}
+.lr.acc{margin-top:10px;border:1px solid var(--line);border-radius:14px;background:var(--surface2);width:100%;font-size:14px}
+.lr.acc .lk{font-family:var(--sans);font-size:13px;font-weight:600}
+.lf{margin-top:auto;padding:9px 12px;background:color-mix(in srgb,var(--gold) 8%,transparent);display:grid;gap:3px;font-size:11.5px}
+.lf div{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.lf span{color:var(--muted)}.lf b{font-weight:500;font-size:12.5px}
+@media (max-width:380px){.lr{padding:10px 9px;font-size:14px}.lh{padding:9px}.lf{padding:8px 9px}}
+/* ventana de detalle */
+.mdl{position:fixed;inset:0;z-index:50;background:rgba(5,8,11,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center;padding:0}
+.sheet{position:relative;width:100%;max-width:520px;max-height:84vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:22px 22px 0 0;box-shadow:0 -20px 50px -20px rgba(0,0,0,.6);padding:22px 18px calc(22px + env(safe-area-inset-bottom,0px));animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(24px);opacity:0}}
+.sheet .x{position:absolute;right:14px;top:14px}
+.sheet h3{margin:10px 0 2px;font-family:var(--serif);font-weight:400;font-size:26px;line-height:1.1}
+.sheet .mt{margin:12px 0 4px;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:26px;font-weight:400}
+.sheet .mt small{display:block;font:600 9.5px var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.sheet .kv{border-bottom:1px solid var(--line);padding-left:0;padding-right:0}
+.sheet .kh{padding-left:0}
+.sheet .op{padding:10px 0;grid-template-columns:0 1fr auto}
+@media (min-width:640px){.mdl{align-items:center}.sheet{border-radius:22px}}
 </style></head><body>
 <div class="wrap">
   <header>
@@ -295,7 +324,7 @@ tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
   </section>
 
   <section class="card" aria-label="Patas netas">
-    <div class="card-h"><h2>Patas netas</h2><span class="sub">Cada contrato son 100 acciones</span></div>
+    <div class="card-h"><h2>Patas netas</h2><span class="sub">Lotes de 100 acciones · tocá una base</span></div>
     <div class="legs" id="legs"></div>
   </section>
 
@@ -308,6 +337,7 @@ tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
     <div class="grid3" id="opsum"></div>
     <div class="days" id="opex"></div>
   </section>
+  <div id="mdl" class="mdl" hidden><div class="sheet" role="dialog" aria-modal="true" aria-label="Detalle de la operación"><button id="mdx" class="x" type="button" aria-label="Cerrar">×</button><div id="mdb"></div></div></div>
   <footer id="foot"></footer>
 </div>
 
@@ -576,18 +606,54 @@ function drawGreeks(){
   });
 }
 
+function openSheet(build){
+  const m=$('mdl'),b=$('mdb');b.textContent='';build(b);m.hidden=false;document.body.style.overflow='hidden';
+  const cb=$('mdx');cb.focus({preventScroll:true});
+}
+function closeSheet(){$('mdl').hidden=true;document.body.style.overflow=''}
+function legSheet(kind,k,ops,title,sub,cash,avg){
+  openSheet(b=>{
+    b.append(el('span','tag '+(kind==='CALL'?'c':kind==='PUT'?'p':''),kind==='ACC'?'ACC':kind));
+    b.append(el('h3',null,title),el('div','sub',sub));
+    const t=el('div','mt '+cls(cash));t.append(el('small',null,'Efectivo neto'),document.createTextNode(money(cash)));b.append(t);
+    if(avg!=null){const r=el('div','kv');r.append(el('span',null,'Prima promedio'),el('span','m plain',nf2.format(avg)));b.append(r)}
+    b.append(el('div','kh','Operaciones'));
+    ops.slice().sort((x,y)=>String(y.fecha||'').localeCompare(String(x.fecha||''))).forEach(o=>{
+      const r=el('div','op');
+      const a=el('div','a');a.append(el('div',null,(o.qty>0?'Compra ':'Venta ')+nf0.format(Math.abs(o.qty))+(kind==='ACC'?' acciones':' lotes')),el('small',null,(o.fecha?fdate(o.fecha)+' · ':'')+'Precio '+nf2.format(o.p)));
+      r.append(el('span'),a,el('div','m '+cls(o.neto),money(o.neto)));b.append(r);
+    });
+  });
+}
 function drawLegs(a){
   const c=$('legs');c.textContent='';
   const gl=netLegs(state.rows).filter(l=>l.qty!==0);
   if(!gl.length&&a.accQty===0){c.append(el('div','sub','La planilla no tiene patas abiertas en este bloque.'));return}
-  gl.forEach(l=>{
-    const d=el('div','leg');
-    d.append(el('span','tag '+(l.kind==='CALL'?'c':'p'),l.kind));
-    const mid=el('div');mid.append(el('div','t',(l.qty>0?'Comprada ':'Vendida ')+nf0.format(Math.abs(l.qty))+' × base '+nf0.format(l.k)),el('div','d','Prima promedio '+nf2.format(l.p)+' · '+l.n+(l.n===1?' operación':' operaciones')));
-    const m=el('div','m '+cls(l.cash),money(l.cash));m.append(el('small',null,'efectivo'));
-    d.append(mid,m);c.append(d);
+  const g2=el('div','lg2');
+  [['CALL','Calls','c'],['PUT','Puts','p']].forEach(([kind,name,cc])=>{
+    const ls=gl.filter(l=>l.kind===kind).sort((x,y)=>x.k-y.k);
+    const col=el('div','lcol');
+    const net=ls.reduce((s,l)=>s+l.qty,0),cash=ls.reduce((s,l)=>s+l.cash,0);
+    const h=el('div','lh');h.append(el('span','tag '+cc,name.toUpperCase()),el('span','lsub',ls.length+(ls.length===1?' base':' bases')));col.append(h);
+    if(!ls.length)col.append(el('div','lempty','Sin posición'));
+    ls.forEach(l=>{
+      const b=el('button','lr');b.type='button';
+      b.append(el('span','lk',nf0.format(l.k)),el('span','lq '+(l.qty>0?'pos':'neg'),(l.qty>0?'+':'−')+nf0.format(Math.abs(l.qty))));
+      b.addEventListener('click',()=>legSheet(kind,l.k,state.rows.filter(r=>r.kind===kind&&r.k===l.k),(l.qty>0?'Comprada ':'Vendida ')+nf0.format(Math.abs(l.qty))+' × base '+nf0.format(l.k),l.n+(l.n===1?' operación':' operaciones'),l.cash,l.p));
+      col.append(b);
+    });
+    const f=el('div','lf');
+    const r1=el('div');r1.append(el('span',null,'Lotes netos'),el('b','mono '+(net>0?'pos':net<0?'neg':''),(net>0?'+':net<0?'−':'')+nf0.format(Math.abs(net))));
+    const r2=el('div');r2.append(el('span',null,'Efectivo'),el('b','mono '+cls(cash),money(cash)));
+    f.append(r1,r2);col.append(f);g2.append(col);
   });
-  if(a.accQty!==0){const d=el('div','leg');d.append(el('span','tag','ACC'));const mid=el('div');mid.append(el('div','t',(a.accQty>0?'Compradas ':'Vendidas ')+nf0.format(Math.abs(a.accQty))+' acciones'),el('div','d',state.acc.length+' operaciones'));const m=el('div','m '+cls(state.accCash),money(state.accCash));m.append(el('small',null,'efectivo'));d.append(mid,m);c.append(d)}
+  c.append(g2);
+  if(a.accQty!==0){
+    const b=el('button','lr acc');b.type='button';
+    b.append(el('span','lk','Acciones'),el('span','lq '+(a.accQty>0?'pos':'neg'),(a.accQty>0?'+':'−')+nf0.format(Math.abs(a.accQty))));
+    b.addEventListener('click',()=>legSheet('ACC',null,state.acc,(a.accQty>0?'Compradas ':'Vendidas ')+nf0.format(Math.abs(a.accQty))+' acciones',state.acc.length+' operaciones',state.accCash,null));
+    c.append(b);
+  }
 }
 
 function drawDays(){
@@ -731,6 +797,10 @@ async function loadNY(){
   nyBusy=false;
 }
 loadNY();setInterval(()=>{if(!document.hidden)loadNY()},60000);
+
+$('mdx').addEventListener('click',closeSheet);
+$('mdl').addEventListener('click',e=>{if(e.target===$('mdl'))closeSheet()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('mdl').hidden)closeSheet()});
 $('tiraBox').addEventListener('scroll',()=>{if(!prog)userScrolled=true});
 $('refresh').addEventListener('click',load);
 $('msgx').addEventListener('click',()=>{$('msg').hidden=true});
