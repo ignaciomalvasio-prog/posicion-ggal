@@ -644,12 +644,14 @@ async function loadOpex(){
 }
 function opCalc(o){
   const res=o.lineas.reduce((s,l)=>s+l.v,0);
-  const don=o.donacion||{pct:10,realizada:0};
+  const don=o.donacion||{pct:10};
+  const pagos=don.pagos||(don.realizada?[{fecha:null,v:don.realizada,detalle:don.detalle}]:[]);
+  const paid=pagos.reduce((a,x)=>a+x.v,0);
   const comp=Math.round(Math.max(res,0)*(don.pct||0)/100);
-  const pend=comp-(don.realizada||0);
+  const pend=comp-paid;
   const hasS=o.saldoInicio!=null&&o.saldoCierre!=null;
   const conc=hasS?o.saldoCierre-o.saldoInicio:null;
-  return {res,comp,pend,conc,diff:hasS?conc-res:null,hasS,don};
+  return {res,comp,pend,conc,diff:hasS?conc-res:null,hasS,don,pagos};
 }
 function drawOpex(){
   const box=$('opex'),sum=$('opsum');box.textContent='';sum.textContent='';
@@ -679,7 +681,7 @@ function drawOpex(){
     }
     det.append(el('div','kh','Donación ('+c.don.pct+'% de la ganancia)'));
     det.append(kv(c.don.pct+'% del resultado',c.comp,'plain'));
-    if(c.don.realizada)det.append(kv('(−) '+(c.don.detalle||'Donación realizada'),-c.don.realizada,'plain'));
+    c.pagos.forEach(x=>det.append(kv('(−) Donación realizada'+(x.fecha?' '+fdate(x.fecha):''),-x.v,'plain')));
     det.append(kv('Donación pendiente',c.pend,'tot'));
     const meta=[o.cuenta?'Cuenta '+o.cuenta:'',o.nota||''].filter(Boolean).join(' · ');
     if(meta)det.append(el('div','onote',meta));

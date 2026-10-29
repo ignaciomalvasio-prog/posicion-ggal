@@ -38,8 +38,16 @@
       "saldoCierre": 3658955,
       "donacion": {
         "pct": 10,
-        "realizada": 73000,
-        "detalle": "Donación realizada 30/09/2026"
+        "pagos": [
+          {
+            "fecha": "2026-09-30",
+            "v": 73000
+          },
+          {
+            "fecha": "2026-10-31",
+            "v": 113686
+          }
+        ]
       }
     }
   ]
