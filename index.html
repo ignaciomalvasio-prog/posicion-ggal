@@ -773,9 +773,11 @@ function showChip(label,pct,title){
 async function loadNY(){
   if(nyBusy)return;nyBusy=true;
   try{
-    // horario de BYMA: lunes a viernes de 10:30 a 17:00 (hora de Argentina, UTC-3)
+    // horario de BYMA (hora de Argentina, UTC-3): lunes a viernes de 10:30 a 17:00 con horario de verano de EE.UU.,
+    // y hasta las 18:00 con horario de invierno (opciones y contado 24 hs), como indicó BYMA desde el 02/11/2026
     const ar=new Date(Date.now()-3*3600e3),wd=ar.getUTCDay(),hm=ar.getUTCHours()*60+ar.getUTCMinutes();
-    const byma=wd>=1&&wd<=5&&hm>=10*60+30&&hm<17*60;
+    let invierno=false;try{invierno=/EST/.test(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',timeZoneName:'short'}).format(new Date(Date.now())))}catch(e){}
+    const byma=wd>=1&&wd<=5&&hm>=10*60+30&&hm<(invierno?18:17)*60;
     // movimiento de BYMA: precio actual de la planilla contra el último cierre
     const bp=(state.spot&&prevClose)?(state.spot/prevClose-1)*100:null;
     if(byma){showChip('Hoy',bp,'Precio de la planilla contra el cierre anterior');nyBusy=false;return}
