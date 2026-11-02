@@ -414,16 +414,17 @@ function parseBlock(g){
 function gviz(range,tab){
   return 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:csv&headers=0&sheet='+encodeURIComponent(tab||TAB)+'&range='+range+'&_='+Date.now();
 }
-async function getCsv(range,tab){
-  let res;
-  try{res=await fetch(gviz(range,tab),{cache:'no-store'})}catch(e){throw {code:'network',message:'No pude leer la planilla. Si tu conexión anda, revisá que esté compartida por enlace.'}}
+async function getCsv(range,tab,ms){
+  let res;const ac=new AbortController();const tm=setTimeout(()=>ac.abort(),ms||12000);
+  try{res=await fetch(gviz(range,tab),{cache:'no-store',signal:ac.signal})}catch(e){clearTimeout(tm);throw {code:'network',message:'No pude leer la planilla (sin respuesta). Revisá tu conexión y reintentá.'}}
+  clearTimeout(tm);
   if(!res.ok) throw {code:'http',message:'Google Sheets respondió '+res.status+'.'};
   const t=await res.text();
   if(/^\s*<(!doctype|html)/i.test(t)) throw {code:'private',message:'La planilla no permite lectura por enlace.'};
   return csv(t);
 }
 async function readLive(){
-  const [g,s,h,t,gr,md]=await Promise.all([getCsv('BG1:BX120'),getCsv('AC1:AD8').catch(()=>null),getCsv('M34:P40').catch(()=>null),getCsv('M2:P36').catch(()=>null),getCsv('M42:P52').catch(()=>null),getCsv('A1:K40','MD').catch(()=>null)]);
+  const [g,s,h,t,gr,md]=await Promise.all([getCsv('BG1:BX120'),getCsv('AC1:AD8',null,7000).catch(()=>null),getCsv('M34:P40',null,7000).catch(()=>null),getCsv('M2:P36',null,7000).catch(()=>null),getCsv('M42:P52',null,7000).catch(()=>null),getCsv('A1:K40','MD',7000).catch(()=>null)]);
   const out=parseBlock(g);
   out.spot=null;out.spotDate=null;out.hoy=null;out.acum=null;out.tira=null;
   const find=(rows,re,c)=>(rows||[]).find(x=>re.test(String(x[c]||'').trim()));
@@ -488,7 +489,7 @@ function render(){
   add('Peor resultado',money(a.mn),cls(a.mn));
   add('Mejor resultado',a.openUp&&a.slopeHi>0?'sin tope':money(a.mx),'pos');
   add('Equilibrio',a.bes.length?a.bes.map(v=>nf0.format(v)).join(' · '):'—','');
-  drawChart(a);drawTira(a);drawGreeks();drawLegs(a);drawDays();
+  for(const fn of [()=>drawChart(a),()=>drawTira(a),drawGreeks,()=>drawLegs(a),drawDays]){try{fn()}catch(e){console.error(e)}}
   const f=$('foot');f.textContent='Datos de la hoja "'+TAB+'" de tu planilla EPGB DI-FE. ';
   const lk=el('a',null,'Abrir planilla');lk.href=SHEET_URL;lk.target='_blank';lk.rel='noopener';f.append(lk);
 }
@@ -690,14 +691,14 @@ function showErr(e){
 let busy=false;
 async function load(){
   if(busy)return;busy=true;const btn=$('refresh');btn.disabled=true;btn.classList.add('spin');
-  const prev=state.source;state.source='load';render();
+  const prev=state.source;state.source='load';try{render()}catch(e){console.error(e)}
   try{
     const r=await readLive();
     if(r.prevClose)prevClose=r.prevClose;
     state={greeks:r.greeks||state.greeks,rows:r.rows,acc:r.acc,accCash:r.accCash,spot:r.spot||state.spot,spotDate:r.spotDate||state.spotDate,hoy:r.hoy,acum:r.acum,tira:r.tira||state.tira,source:'live',at:r.at};
     $('msg').hidden=true;
   }catch(e){state.source=prev==='live'?'live':'snap';showErr(e)}
-  busy=false;btn.disabled=false;btn.classList.remove('spin');render();loadNY();loadOpex();
+  busy=false;btn.disabled=false;btn.classList.remove('spin');try{render()}catch(e){console.error(e)}try{loadNY()}catch(e){}try{loadOpex()}catch(e){}
 }
 
 
