@@ -761,8 +761,9 @@ loadOpex();
 const NY_URL='https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=GGAL&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json';
 let nyBusy=false,prevClose=null;
 function pnum(x){const n=parseFloat(String(x==null?'':x).replace(/[^0-9.\-+]/g,''));return isFinite(n)?n:null}
-function showChip(label,pct,title){
+function showChip(label,pct,title,txt){
   const n=$('ny');
+  if(txt&&(pct==null||!isFinite(pct))){n.className='ny';n.textContent='';const b0=document.createElement('b');b0.textContent=label;n.append(b0,document.createTextNode(txt));n.title=title||'';n.hidden=false;return}
   if(pct==null||!isFinite(pct)){n.hidden=true;return}
   n.className='ny '+cls(pct);n.textContent='';
   const b=document.createElement('b');b.textContent=label;
@@ -781,23 +782,30 @@ async function loadNY(){
     // movimiento de BYMA: precio actual de la planilla contra el último cierre
     const bp=(state.spot&&prevClose)?(state.spot/prevClose-1)*100:null;
     if(byma){showChip('Hoy',bp,'Precio de la planilla contra el cierre anterior');nyBusy=false;return}
-    // fuera de rueda: pre / post de Nueva York (CNBC); si no hay, el cambio del último día de BYMA
-    let label='Cierre',pct=bp,ttl='Precio de la planilla contra el cierre anterior';
+    // fuera de rueda de BYMA: pre / post de Nueva York (CNBC). La sesión se calcula con el reloj de Nueva York.
+    let label='Cierre',pct=bp,ttl='Precio de la planilla contra el cierre anterior',txt=null;
     try{
+      const P={};new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',weekday:'short',hourCycle:'h23'}).formatToParts(new Date(Date.now())).forEach(x=>P[x.type]=x.value);
+      const etDay=P.year+'-'+P.month+'-'+P.day,etm=(+P.hour)*60+(+P.minute),wk=!/Sat|Sun/.test(P.weekday);
+      const sess=!wk?'closed':etm>=240&&etm<570?'pre':etm>=570&&etm<960?'reg':etm>=960&&etm<1200?'post':'closed';
       const c=new AbortController();const to=setTimeout(()=>c.abort(),8000);
       const r=await fetch(NY_URL,{signal:c.signal,cache:'no-store'});clearTimeout(to);
       const q=(await r.json()).FormattedQuoteResult.FormattedQuote[0];
-      const st=String(q.curmktstatus||''),e=q.ExtendedMktQuote,ep=e?pnum(e.change_pct):null;
-      const isPre=e&&/PRE/i.test(e.type||''),isPost=e&&/POST/i.test(e.type||'');
+      const e=q.ExtendedMktQuote,et=String((e&&e.type)||'').toUpperCase(),ep=e?pnum(e.change_pct):null;
       const dayOf=x=>String(x||'').slice(0,10);
-      if(/PRE/i.test(st)&&isPre&&ep!=null){label='Pre';pct=ep;ttl='GGAL en Nueva York, pre-market'}
-      else if(/POST/i.test(st)&&isPost&&ep!=null){label='Post';pct=ep;ttl='GGAL en Nueva York, after-market'}
-      else if(!/REG/i.test(st)&&isPost&&ep!=null&&dayOf(e.last_time)===dayOf(q.last_time)){label='Post';pct=ep;ttl='GGAL en Nueva York, after-market'}
+      if(sess==='pre'){
+        if(et==='PRE_MKT'&&ep!=null&&dayOf(e.last_time)===etDay){label='Pre';pct=ep;ttl='GGAL en Nueva York, pre-market'}
+        else{label='Pre';pct=null;txt='s/d';ttl='Nueva York está en pre-market, todavía sin operaciones de GGAL'}
+      }else if(sess==='post'){
+        if(et==='POST_MKT'&&ep!=null&&dayOf(e.last_time)===etDay){label='Post';pct=ep;ttl='GGAL en Nueva York, after-market'}
+        else{label='Post';pct=null;txt='s/d';ttl='Nueva York está en after-market, todavía sin operaciones de GGAL'}
+      }else if(sess==='closed'&&et==='POST_MKT'&&ep!=null&&dayOf(e.last_time)===dayOf(q.last_time)){label='Post';pct=ep;ttl='GGAL en Nueva York, after-market'}
     }catch(e){}
-    showChip(label,pct,ttl);
+    showChip(label,pct,ttl,txt);
   }catch(e){}
   nyBusy=false;
 }
+
 loadNY();setInterval(()=>{if(!document.hidden)loadNY()},60000);
 
 $('mdx').addEventListener('click',closeSheet);
