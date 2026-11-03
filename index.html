@@ -74,6 +74,14 @@ button:focus-visible,summary:focus-visible,svg:focus-visible{outline:2px solid v
 .bigcard .l,.stat .l{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--muted)}
 .bigcard .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500;font-size:clamp(30px,8.4vw,48px);line-height:1.1;margin-top:8px;letter-spacing:-.01em;overflow-wrap:anywhere}
 .bigcard .s{font-size:12.5px;color:var(--muted);margin-top:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid3 .stat .v{font-size:clamp(13px,4.1vw,19px);white-space:nowrap;overflow-wrap:normal}
+.grid3 .gh{font-size:10.5px;color:var(--muted);line-height:1.3}
+.pvol{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.pvol b{font-family:var(--mono);color:var(--text,inherit);font-weight:500;min-width:58px;text-align:center}
+.pvol button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:inherit;font-size:18px;line-height:1;cursor:pointer}
+.pvol .rs{width:auto;padding:0 10px;font-size:12px}
+.pnote{flex-basis:100%;text-align:center;font-size:11.5px;line-height:1.4}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .stat{display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px 10px;text-align:center;min-width:0}
 .stat .l{font-size:10.5px}
@@ -328,6 +336,12 @@ tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
     <div class="grid2" id="greeks"></div>
   </section>
 
+  <section class="card" aria-label="Probabilidad">
+    <div class="card-h"><h2>Probabilidad al vencimiento</h2><span class="sub">Modelo lognormal con la volatilidad de la planilla</span></div>
+    <div class="grid3" id="prob"></div>
+    <div class="pvol" id="pvol"></div>
+  </section>
+
   <section class="card" aria-label="Patas netas">
     <div class="card-h"><h2>Patas netas</h2><span class="sub">Lotes de 100 acciones · tocá una base</span></div>
     <div class="legs" id="legs"></div>
@@ -433,7 +447,7 @@ async function readLive(){
   const out=parseBlock(g);
   out.spot=null;out.spotDate=null;out.hoy=null;out.acum=null;out.tira=null;
   const find=(rows,re,c)=>(rows||[]).find(x=>re.test(String(x[c]||'').trim()));
-  if(s){const p=find(s,/^precio/i,1),f=find(s,/^fecha actual/i,1);if(p)out.spot=num(p[0]);if(f)out.spotDate=pdate(f[0])}
+  if(s){const p=find(s,/^precio/i,1),f=find(s,/^fecha actual/i,1);if(p)out.spot=num(p[0]);if(f)out.spotDate=pdate(f[0]);const vc=find(s,/^volatilidad calls/i,1),vp=find(s,/^volatilidad puts/i,1),tr=find(s,/^tasa libre/i,1);const pc=v=>{if(!v)return null;let n=num(v[0]);if(n==null)return null;if(/%/.test(v[0]))n/=100;else if(n>3)n/=100;return n>0&&n<5?n:null};out.vol=pc(vc)||pc(vp);out.rate=pc(tr)}
   if(h){const a=find(h,/^resultado acumulado/i,0),y=find(h,/^resultado hoy/i,0);if(a)out.acum=num(a[3]);if(y)out.hoy=num(y[3])}
   if(t){const tr=[];t.forEach(x=>{const p=num(x[1]),f=num(x[2]),o=num(x[3]);if(p&&p>100&&f!=null&&o!=null)tr.push({price:p,fin:f,teo:o})});if(tr.length>=5)out.tira=tr}
   out.prevClose=null;
@@ -494,7 +508,7 @@ function render(){
   add('Peor resultado',money(a.mn),cls(a.mn));
   add('Mejor resultado',a.openUp&&a.slopeHi>0?'sin tope':money(a.mx),'pos');
   add('Equilibrio',a.bes.length?a.bes.map(v=>nf0.format(v)).join(' · '):'—','');
-  for(const fn of [()=>drawChart(a),()=>drawTira(a),drawGreeks,()=>drawLegs(a),drawDays]){try{fn()}catch(e){console.error(e)}}
+  for(const fn of [()=>drawChart(a),()=>drawTira(a),drawGreeks,()=>drawProb(a),()=>drawLegs(a),drawDays]){try{fn()}catch(e){console.error(e)}}
   const f=$('foot');f.textContent='Datos de la hoja "'+TAB+'" de tu planilla EPGB DI-FE. ';
   const lk=el('a',null,'Abrir planilla');lk.href=SHEET_URL;lk.target='_blank';lk.rel='noopener';f.append(lk);
 }
@@ -612,6 +626,34 @@ function drawGreeks(){
   });
 }
 
+/* ---------- probabilidad ---------- */
+let volAdj=0;try{volAdj=parseFloat(localStorage.getItem('ggal-voladj'))||0}catch(e){}
+function probCalc(a,S0,sig,r,T){
+  if(!(S0>0&&sig>0&&T>0))return null;
+  const N=1600,zm=7,dz=2*zm/N,m=(r-sig*sig/2)*T,sd=sig*Math.sqrt(T);let pw=0,po=0,ev=0,tw=0;
+  for(let i=0;i<=N;i++){const z=-zm+i*dz,w=Math.exp(-z*z/2)*dz,S=S0*Math.exp(m+sd*z),v=a.f(S);tw+=w;if(v>0)pw+=w;ev+=w*v;if(S<S0*0.9||S>S0*1.1)po+=w}
+  return {pw:pw/tw,po:po/tw,ev:ev/tw};
+}
+function drawProb(a){
+  const box=$('prob'),pv=$('pvol');box.textContent='';pv.textContent='';
+  const base=state.vol||null;
+  if(!base||!state.spot){box.append(el('div','sub','La planilla no devolvió la volatilidad o el precio.'));return}
+  const sig=Math.max(0.05,base+volAdj/100),r=state.rate==null?0.2:state.rate,T=Math.max(0,(EXPIRY-new Date())/(365*86400000));
+  const P=probCalc(a,state.spot,sig,r,T);
+  if(!P){box.append(el('div','sub','Sin días al vencimiento para calcular.'));return}
+  const pc=x=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:0}).format(x*100)+'%';
+  const add=(l,v,c,h)=>{const d=el('div','stat');d.append(el('div','l',l),el('div','v '+(c||''),v),el('div','gh',h));box.append(d)};
+  add('Terminar en ganancia',pc(P.pw),P.pw>=0.5?'pos':'neg','entre tus equilibrios');
+  add('Mover más de ±10%',pc(P.po),'','zona de regla de oro');
+  add('Resultado esperado',money(Math.round(P.ev)),cls(P.ev),'promedio ponderado');
+  const mk=(t,fn)=>{const b=el('button',null,t);b.type='button';b.onclick=fn;return b};
+  const set=v=>{volAdj=v;try{localStorage.setItem('ggal-voladj',String(v))}catch(e){}drawProb(a)};
+  pv.append(el('span',null,'Volatilidad'),mk('−',()=>set(volAdj-2)),el('b',null,new Intl.NumberFormat('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1}).format(sig*100)+'%'),mk('+',()=>set(volAdj+2)));
+  {const rb=mk('Planilla',()=>set(0));rb.className='rs';if(!volAdj)rb.style.visibility='hidden';pv.append(rb)}
+  const lo=probCalc(a,state.spot,Math.max(0.05,sig-0.1),r,T),hi=probCalc(a,state.spot,sig+0.1,r,T);
+  pv.append(el('div','pnote','Ganancia con volatilidad −10 pts: '+pc(lo.pw)+' · +10 pts: '+pc(hi.pw)+'. Es un modelo (neutral al riesgo, sin colas pesadas ni ajustes): una referencia, no un pronóstico.'));
+}
+
 function openSheet(build){
   const m=$('mdl'),b=$('mdb');b.textContent='';build(b);m.hidden=false;document.body.style.overflow='hidden';
   const cb=$('mdx');cb.focus({preventScroll:true});
@@ -700,7 +742,7 @@ async function load(){
   try{
     const r=await readLive();
     if(r.prevClose)prevClose=r.prevClose;
-    state={greeks:r.greeks||state.greeks,rows:r.rows,acc:r.acc,accCash:r.accCash,spot:r.spot||state.spot,spotDate:r.spotDate||state.spotDate,hoy:r.hoy,acum:r.acum,tira:r.tira||state.tira,source:'live',at:r.at};
+    state={greeks:r.greeks||state.greeks,rows:r.rows,acc:r.acc,accCash:r.accCash,vol:r.vol||state.vol,rate:r.rate==null?state.rate:r.rate,spot:r.spot||state.spot,spotDate:r.spotDate||state.spotDate,hoy:r.hoy,acum:r.acum,tira:r.tira||state.tira,source:'live',at:r.at};
     $('msg').hidden=true;
   }catch(e){state.source=prev==='live'?'live':'snap';showErr(e)}
   busy=false;btn.disabled=false;btn.classList.remove('spin');try{render()}catch(e){console.error(e)}try{loadNY()}catch(e){}try{loadOpex()}catch(e){}
@@ -822,7 +864,7 @@ $('refresh').addEventListener('click',load);
 $('msgx').addEventListener('click',()=>{$('msg').hidden=true});
 $('tgFin').addEventListener('click',e=>{showFin=!showFin;if(!showFin&&!showTeo){showTeo=true;$('tgTeo').setAttribute('aria-pressed','true')}e.currentTarget.setAttribute('aria-pressed',String(showFin));render()});
 $('tgTeo').addEventListener('click',e=>{showTeo=!showTeo;if(!showFin&&!showTeo){showFin=true;$('tgFin').setAttribute('aria-pressed','true')}e.currentTarget.setAttribute('aria-pressed',String(showTeo));render()});
-try{const L=JSON.parse(localStorage.getItem('ggal-last')||'null');if(L&&L.rows){if(L.prevClose)prevClose=L.prevClose;state={greeks:L.greeks||SNAP.greeks,rows:L.rows,acc:L.acc||[],accCash:L.accCash||0,spot:L.spot||SNAP.spot,spotDate:L.spotDate||SNAP.spotDate,hoy:L.hoy==null?null:L.hoy,acum:L.acum==null?null:L.acum,tira:L.tira||SNAP.tira,source:'live',at:L.at}}}catch(e){}
+try{const L=JSON.parse(localStorage.getItem('ggal-last')||'null');if(L&&L.rows){if(L.prevClose)prevClose=L.prevClose;state={greeks:L.greeks||SNAP.greeks,rows:L.rows,acc:L.acc||[],accCash:L.accCash||0,vol:L.vol,rate:L.rate,spot:L.spot||SNAP.spot,spotDate:L.spotDate||SNAP.spotDate,hoy:L.hoy==null?null:L.hoy,acum:L.acum==null?null:L.acum,tira:L.tira||SNAP.tira,source:'live',at:L.at}}}catch(e){}
 render();
 load();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
