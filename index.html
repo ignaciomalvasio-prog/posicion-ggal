@@ -316,6 +316,7 @@ tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
     <div class="bigcard"><div class="l">Resultado acumulado</div><div class="v" id="acum">—</div></div>
     <div class="bigcard gold"><div class="l">GGAL en la planilla</div><div class="v" id="spot">—</div><div class="s" id="spots"></div></div>
     <div class="grid2" id="stats"></div>
+    <div class="sub" id="rngnote" style="text-align:center;margin-top:10px"></div>
   </section>
 
   <section class="card" aria-label="Gráfico">
@@ -480,13 +481,14 @@ function analyze(st){
   if(state.tira&&state.tira.length>4){const ps=state.tira.map(t=>t.price);lo=Math.min(lo,Math.floor(Math.min(...ps)/100)*100);hi=Math.max(hi,Math.ceil(Math.max(...ps)/100)*100)}
   const slopeHi=accQty+legs.reduce((s,l)=>s+(l.kind==='CALL'?l.qty*MULT:0),0);
   const pts=[0,...ks,hi*3].sort((a,b)=>a-b);
-  let mx=-Infinity,mn=Infinity;pts.forEach(S=>{const v=f(S);if(v>mx)mx=v;if(v<mn)mn=v});
+  const sp0=st.spot||(kmin+kmax)/2,rlo=sp0*0.5,rhi=sp0*1.5;
+  let mx=-Infinity,mn=Infinity;[rlo,rhi,...ks.filter(k=>k>rlo&&k<rhi)].forEach(S=>{const v=f(S);if(v>mx)mx=v;if(v<mn)mn=v});
   const bes=[];
   for(let i=0;i<pts.length-1;i++){
     const a=pts[i],b=pts[i+1],fa=f(a),fb=f(b);
     if(fa===0&&a>0)bes.push(a);else if(fa*fb<0)bes.push(a+(0-fa)*(b-a)/(fb-fa));
   }
-  return {legs,accQty,cash,f,lo,hi,mx,mn,openUp:slopeHi!==0,slopeHi,bes:[...new Set(bes.map(v=>Math.round(v)))]};
+  return {legs,accQty,cash,f,lo,hi,mx,mn,rlo,rhi,openUp:slopeHi!==0,slopeHi,bes:[...new Set(bes.map(v=>Math.round(v)))]};
 }
 
 /* ---------- dibujo ---------- */
@@ -506,7 +508,8 @@ function render(){
   const add=(l,v,c)=>{const d=el('div','stat');d.append(el('div','l',l),el('div','v '+(c||''),v));st.append(d)};
   if(state.spot){const rv=a.f(state.spot);add('Si queda en este precio',money(rv),cls(rv))}
   add('Peor resultado',money(a.mn),cls(a.mn));
-  add('Mejor resultado',a.openUp&&a.slopeHi>0?'sin tope':money(a.mx),'pos');
+  add('Mejor resultado',money(a.mx),cls(a.mx));
+  {const rn=$('rngnote');if(rn)rn.textContent='Mejor y peor resultado con el precio entre $'+nf0.format(a.rlo)+' (−50%) y $'+nf0.format(a.rhi)+' (+50%)'}
   add('Equilibrio',a.bes.length?a.bes.map(v=>nf0.format(v)).join(' · '):'—','');
   for(const fn of [()=>drawChart(a),()=>drawTira(a),drawGreeks,()=>drawProb(a),()=>drawLegs(a),drawDays]){try{fn()}catch(e){console.error(e)}}
   const f=$('foot');f.textContent='Datos de la hoja "'+TAB+'" de tu planilla EPGB DI-FE. ';
