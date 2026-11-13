@@ -652,8 +652,9 @@ function parseAlerts(rows){
     if(!/^GFG[VC]/i.test(tk))return;
     const kind=/^GFGV/i.test(tk)?'PUT':'CALL',acc=String(r[6]||'').trim(),sig=String(r[10]||'').trim();
     if(!/^(VENDER|RECOMPRAR)$/.test(acc)||!sig)return;
-    const good=sig.indexOf('✅')>=0;
-    if(!good)return;
+    const good=sig.indexOf('✅')>=0,intr=num(r[5]);
+    // solo cuenta si la opción está en el dinero (valor intrínseco > 0): una OTM lejana que va a valer 0 no es oportunidad
+    if(!good||!(intr>0))return;
     const lots=num(r[2]);
     items.push({id:tk+'|'+acc+'|'+(good?'ok':'w'),good,acc,kind,base:String(r[0]).trim(),lots,mkt:String(r[8]||'').trim(),cut:String(r[7]||'').trim(),sig:sig.replace(/^[^A-Za-zÁ-ú]+/,''),adv:String(r[11]||'').trim()});
   });
