@@ -652,8 +652,8 @@ function parseAlerts(rows){
     if(!/^GFG[VC]/i.test(tk))return;
     const kind=/^GFGV/i.test(tk)?'PUT':'CALL',acc=String(r[6]||'').trim(),sig=String(r[10]||'').trim();
     if(!/^(VENDER|RECOMPRAR)$/.test(acc)||!sig)return;
-    const good=sig.indexOf('✅')>=0,warn=/rinde más que vencer/i.test(sig);
-    if(!good&&!warn)return;
+    const good=sig.indexOf('✅')>=0;
+    if(!good)return;
     const lots=num(r[2]);
     items.push({id:tk+'|'+acc+'|'+(good?'ok':'w'),good,acc,kind,base:String(r[0]).trim(),lots,mkt:String(r[8]||'').trim(),cut:String(r[7]||'').trim(),sig:sig.replace(/^[^A-Za-zÁ-ú]+/,''),adv:String(r[11]||'').trim()});
   });
