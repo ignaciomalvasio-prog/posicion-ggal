@@ -74,6 +74,15 @@ button:focus-visible,summary:focus-visible,svg:focus-visible{outline:2px solid v
 .bigcard .l,.stat .l{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--muted)}
 .bigcard .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500;font-size:clamp(30px,8.4vw,48px);line-height:1.1;margin-top:8px;letter-spacing:-.01em;overflow-wrap:anywhere}
 .bigcard .s{font-size:12.5px;color:var(--muted);margin-top:8px}
+.alerts{position:relative;margin:0 0 14px;padding:14px 44px 12px 16px;border-radius:16px;border:1px solid color-mix(in srgb,var(--gold) 55%,var(--line));background:linear-gradient(180deg,var(--gold-soft),transparent),var(--surface);box-shadow:var(--shadow)}
+.alerts h3{margin:0 0 8px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:700}
+.alerts .ai{display:flex;gap:8px;align-items:baseline;font-size:13.5px;line-height:1.4;margin:5px 0}
+.alerts .ai i{flex:none;width:8px;height:8px;border-radius:50%;background:var(--pos);transform:translateY(-1px)}
+.alerts .ai.w i{background:var(--gold)}
+.alerts .ai b{font-weight:600}.alerts .ai span{color:var(--muted)}
+.alerts .af{margin-top:8px;font-size:11.5px;color:var(--muted);display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.alerts .af a{color:var(--gold);text-decoration:none;font-weight:600}
+.alerts .ax{position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:10px;border:0;background:transparent;color:var(--muted);font-size:22px;line-height:1;cursor:pointer}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .grid3 .stat .v{font-size:clamp(13px,4.1vw,19px);white-space:nowrap;overflow-wrap:normal}
 .grid3 .gh{font-size:10.5px;color:var(--muted);line-height:1.3}
@@ -309,6 +318,7 @@ tr.now td{background-color:color-mix(in srgb,var(--gold) 11%,transparent)}
       <button id="refresh" class="iconbtn" type="button" aria-label="Actualizar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
     </div>
   </header>
+  <div id="alerts" class="alerts" hidden></div>
   <div id="msg" class="msg" hidden><span id="msgt"></span><button id="msgx" class="x" type="button" aria-label="Cerrar aviso">×</button></div>
 
   <section class="top" aria-label="Resumen">
@@ -444,7 +454,7 @@ async function getCsv(range,tab,ms){
   return csv(t);
 }
 async function readLive(){
-  const [g,s,h,t,gr,md]=await Promise.all([getCsv('BG1:BX120'),getCsv('AC1:AD8',null,7000).catch(()=>null),getCsv('M34:P40',null,7000).catch(()=>null),getCsv('M2:P36',null,7000).catch(()=>null),getCsv('M42:P52',null,7000).catch(()=>null),getCsv('A1:K40','MD',7000).catch(()=>null)]);
+  const [g,s,h,t,gr,md,co]=await Promise.all([getCsv('BG1:BX120'),getCsv('AC1:AD8',null,7000).catch(()=>null),getCsv('M34:P40',null,7000).catch(()=>null),getCsv('M2:P36',null,7000).catch(()=>null),getCsv('M42:P52',null,7000).catch(()=>null),getCsv('A1:K40','MD',7000).catch(()=>null),getCsv('A1:L45','CALC OPCIONES',7000).catch(()=>null)]);
   const out=parseBlock(g);
   out.spot=null;out.spotDate=null;out.hoy=null;out.acum=null;out.tira=null;
   const find=(rows,re,c)=>(rows||[]).find(x=>re.test(String(x[c]||'').trim()));
@@ -455,6 +465,7 @@ async function readLive(){
   if(md){const x=md.find(r=>String(r[0]||'').trim().toUpperCase()==='GGAL');if(x){const c=num(x[9]);if(c&&c>0)out.prevClose=c}}
   out.greeks=null;
   if(gr){const G={};[['delta',/^delta/i],['gamma',/^gamma/i],['vega',/^vega/i],['theta',/^theta/i]].forEach(([k,re])=>{const x=find(gr,re,0);if(x){const a=num(x[1]),b=num(x[2]),c=num(x[3]);if(a!=null)G[k]={g:a,c:b,p:c}}});if(Object.keys(G).length===4)out.greeks=G}
+  out.alerts=parseAlerts(co);
   out.at=Date.now();
   try{localStorage.setItem('ggal-last',JSON.stringify(out))}catch(e){}
   return out;
@@ -511,7 +522,7 @@ function render(){
   add('Mejor resultado',money(a.mx),cls(a.mx));
   {const rn=$('rngnote');if(rn)rn.textContent='Mejor y peor resultado con el precio entre $'+nf0.format(a.rlo)+' (−50%) y $'+nf0.format(a.rhi)+' (+50%)'}
   add('Equilibrio',a.bes.length?a.bes.map(v=>nf0.format(v)).join(' · '):'—','');
-  for(const fn of [()=>drawChart(a),()=>drawTira(a),drawGreeks,()=>drawProb(a),()=>drawLegs(a),drawDays]){try{fn()}catch(e){console.error(e)}}
+  for(const fn of [drawAlerts,()=>drawChart(a),()=>drawTira(a),drawGreeks,()=>drawProb(a),()=>drawLegs(a),drawDays]){try{fn()}catch(e){console.error(e)}}
   const f=$('foot');f.textContent='Datos de la hoja "'+TAB+'" de tu planilla EPGB DI-FE. ';
   const lk=el('a',null,'Abrir planilla');lk.href=SHEET_URL;lk.target='_blank';lk.rel='noopener';f.append(lk);
 }
@@ -627,6 +638,50 @@ function drawGreeks(){
     const b=el('span');b.append(el('i',null,'Put'),document.createTextNode(' '+f(g.p,d)));
     sp.append(a,b);c.append(sp);box.append(c);
   });
+}
+
+/* ---------- avisos de la pestaña CALC OPCIONES ---------- */
+const CALC_GID='748576643';
+function parseAlerts(rows){
+  if(!rows)return null;
+  const items=[];let upd='';
+  rows.forEach(r=>{
+    const a=String(r[0]||'').trim();
+    if(/^última actualización/i.test(a))upd=String(r[1]||'').trim();
+    const tk=String(r[1]||'').trim();
+    if(!/^GFG[VC]/i.test(tk))return;
+    const kind=/^GFGV/i.test(tk)?'PUT':'CALL',acc=String(r[6]||'').trim(),sig=String(r[10]||'').trim();
+    if(!/^(VENDER|RECOMPRAR)$/.test(acc)||!sig)return;
+    const good=sig.indexOf('✅')>=0,warn=/rinde más que vencer/i.test(sig);
+    if(!good&&!warn)return;
+    const lots=num(r[2]);
+    items.push({id:tk+'|'+acc+'|'+(good?'ok':'w'),good,acc,kind,base:String(r[0]).trim(),lots,mkt:String(r[8]||'').trim(),cut:String(r[7]||'').trim(),sig:sig.replace(/^[^A-Za-zÁ-ú]+/,''),adv:String(r[11]||'').trim()});
+  });
+  items.sort((x,y)=>(y.good-x.good));
+  return {items,upd};
+}
+function drawAlerts(){
+  const box=$('alerts');if(!box)return;
+  const A=state.alerts;
+  if(!A||!A.items.length){box.hidden=true;return}
+  const sigKey=A.items.map(i=>i.id).sort().join(',');
+  let dis='';try{dis=localStorage.getItem('ggal-alert-x')||''}catch(e){}
+  if(dis===sigKey){box.hidden=true;return}
+  box.textContent='';box.hidden=false;
+  box.append(el('h3',null,'A revisar en CALC OPCIONES'));
+  A.items.forEach(i=>{
+    const d=el('div','ai'+(i.good?'':' w'));
+    const t=(i.acc==='VENDER'?'Vender ':'Recomprar ')+i.kind.toLowerCase()+' '+i.base;
+    const detail=(i.lots!=null?' ('+(i.lots>0?'+':'')+i.lots+')':'')+(i.good&&i.mkt?' · mercado '+i.mkt+' vs corte '+i.cut:'')+(i.good&&i.adv?' · '+i.adv:'')+(!i.good?' · rinde más que vencer, pero te deja descalzado':'');
+    d.append(el('i'),(()=>{const w=el('div');w.append(el('b',null,t),el('span',null,detail));return w})());
+    box.append(d);
+  });
+  const f=el('div','af');
+  const lk=el('a',null,'Abrir la pestaña');lk.href=SHEET_URL.split('#')[0].split('?')[0]+'#gid='+CALC_GID;lk.target='_blank';lk.rel='noopener';
+  f.append(el('span',null,A.upd?'Cotización '+A.upd:''),lk);box.append(f);
+  const x=el('button','ax','×');x.type='button';x.setAttribute('aria-label','Cerrar aviso');
+  x.onclick=()=>{try{localStorage.setItem('ggal-alert-x',sigKey)}catch(e){}box.hidden=true};
+  box.append(x);
 }
 
 /* ---------- probabilidad ---------- */
@@ -745,7 +800,7 @@ async function load(){
   try{
     const r=await readLive();
     if(r.prevClose)prevClose=r.prevClose;
-    state={greeks:r.greeks||state.greeks,rows:r.rows,acc:r.acc,accCash:r.accCash,vol:r.vol||state.vol,rate:r.rate==null?state.rate:r.rate,spot:r.spot||state.spot,spotDate:r.spotDate||state.spotDate,hoy:r.hoy,acum:r.acum,tira:r.tira||state.tira,source:'live',at:r.at};
+    state={greeks:r.greeks||state.greeks,rows:r.rows,acc:r.acc,accCash:r.accCash,alerts:r.alerts,vol:r.vol||state.vol,rate:r.rate==null?state.rate:r.rate,spot:r.spot||state.spot,spotDate:r.spotDate||state.spotDate,hoy:r.hoy,acum:r.acum,tira:r.tira||state.tira,source:'live',at:r.at};
     $('msg').hidden=true;
   }catch(e){state.source=prev==='live'?'live':'snap';showErr(e)}
   busy=false;btn.disabled=false;btn.classList.remove('spin');try{render()}catch(e){console.error(e)}try{loadNY()}catch(e){}try{loadOpex()}catch(e){}
