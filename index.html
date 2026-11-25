@@ -43,7 +43,7 @@ html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;
   padding-block:max(18px,env(safe-area-inset-top,0px)) calc(40px + env(safe-area-inset-bottom,0px));
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-body::before{content:"";position:fixed;inset:0 0 auto;height:260px;pointer-events:none;z-index:0;
+body::before{content:"";position:absolute;inset:0 0 auto;height:260px;pointer-events:none;z-index:0;
   background:radial-gradient(60% 100% at 80% 0%,var(--gold-soft),transparent 70%)}
 .wrap{position:relative;z-index:1;max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
 .pos{color:var(--pos)}.neg{color:var(--neg)}
